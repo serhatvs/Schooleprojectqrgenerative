@@ -10,6 +10,9 @@ const expirationTimeValue = document.getElementById("expiration-time");
 const statusBadge = document.getElementById("status-badge");
 
 let currentSession = null;
+let adminSecret =
+  typeof window.__ADMIN_SECRET === "string" ? window.__ADMIN_SECRET.trim() : "";
+let panelMessage = null;
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -32,6 +35,50 @@ function normalizeClientSession(session) {
   return session;
 }
 
+function setPanelMessage(title, copy) {
+  panelMessage = { title, copy };
+}
+
+function clearPanelMessage() {
+  panelMessage = null;
+}
+
+function ensureAdminSecret() {
+  if (adminSecret) {
+    return true;
+  }
+
+  const enteredSecret = window.prompt(
+    "Enter the admin secret to use the Attendance QR Panel."
+  );
+
+  if (!enteredSecret || !enteredSecret.trim()) {
+    adminSecret = "";
+    setPanelMessage(
+      "Admin secret required",
+      "Refresh the page and enter the admin secret to use the panel."
+    );
+    renderSession();
+    return false;
+  }
+
+  adminSecret = enteredSecret.trim();
+  window.__ADMIN_SECRET = adminSecret;
+  clearPanelMessage();
+  return true;
+}
+
+function handleUnauthorized() {
+  adminSecret = "";
+  delete window.__ADMIN_SECRET;
+  currentSession = null;
+  setPanelMessage(
+    "Unauthorized",
+    "The admin secret is missing or incorrect. Refresh the page and enter the correct secret."
+  );
+  renderSession();
+}
+
 function formatDate(value) {
   if (!value) {
     return "-";
@@ -50,6 +97,21 @@ function setStatus(status) {
 
 function renderSession() {
   currentSession = normalizeClientSession(currentSession);
+
+  if (panelMessage) {
+    sessionIdValue.textContent = "-";
+    startTimeValue.textContent = "-";
+    expirationTimeValue.textContent = "-";
+    setStatus(null);
+    qrImage.hidden = true;
+    qrImage.removeAttribute("src");
+    qrPlaceholder.hidden = false;
+    placeholderTitle.textContent = panelMessage.title;
+    placeholderCopy.textContent = panelMessage.copy;
+    startButton.disabled = true;
+    endButton.disabled = true;
+    return;
+  }
 
   const hasSession = Boolean(currentSession);
   const isActive = Boolean(currentSession?.active);
@@ -82,15 +144,23 @@ function renderSession() {
     }
   }
 
-  endButton.disabled = !isActive;
+  startButton.disabled = !adminSecret;
+  endButton.disabled = !adminSecret || !isActive;
 }
 
 async function requestJson(url, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+
+  if (adminSecret) {
+    headers["x-admin-secret"] = adminSecret;
+  }
+
   const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-    },
     ...options,
+    headers,
   });
 
   let data = null;
@@ -104,13 +174,32 @@ async function requestJson(url, options = {}) {
   return { response, data };
 }
 
+function getErrorMessage(response, data, fallbackMessage) {
+  if (response.status === 403) {
+    handleUnauthorized();
+    return "The admin secret is missing or incorrect.";
+  }
+
+  if (typeof data?.error === "string") {
+    return data.error;
+  }
+
+  return fallbackMessage;
+}
+
 async function loadSession() {
   const { response, data } = await requestJson("/api/session");
 
-  if (!response.ok) {
-    throw new Error("Failed to load session.");
+  if (response.status === 403) {
+    handleUnauthorized();
+    return;
   }
 
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response, data, "Failed to load session."));
+  }
+
+  clearPanelMessage();
   currentSession = data;
   renderSession();
 }
@@ -121,7 +210,13 @@ async function startSession(replaceActive = false) {
     body: JSON.stringify({ replaceActive }),
   });
 
+  if (response.status === 403) {
+    handleUnauthorized();
+    return;
+  }
+
   if (response.status === 409) {
+    clearPanelMessage();
     currentSession = data;
     renderSession();
 
@@ -137,9 +232,10 @@ async function startSession(replaceActive = false) {
   }
 
   if (!response.ok) {
-    throw new Error("Failed to start session.");
+    throw new Error(getErrorMessage(response, data, "Failed to start session."));
   }
 
+  clearPanelMessage();
   currentSession = data;
   renderSession();
 }
@@ -149,15 +245,30 @@ async function endSession() {
     method: "POST",
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to end session.");
+  if (response.status === 403) {
+    handleUnauthorized();
+    return;
   }
 
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response, data, "Failed to end session."));
+  }
+
+  clearPanelMessage();
   currentSession = data;
   renderSession();
 }
 
 startButton.addEventListener("click", async () => {
+  if (!adminSecret) {
+    setPanelMessage(
+      "Admin secret required",
+      "Refresh the page and enter the admin secret to use the panel."
+    );
+    renderSession();
+    return;
+  }
+
   startButton.disabled = true;
 
   try {
@@ -176,20 +287,32 @@ startButton.addEventListener("click", async () => {
 
     await startSession(false);
   } catch (error) {
-    window.alert(error.message);
+    if (adminSecret) {
+      window.alert(error.message);
+    }
   } finally {
-    startButton.disabled = false;
     renderSession();
   }
 });
 
 endButton.addEventListener("click", async () => {
+  if (!adminSecret) {
+    setPanelMessage(
+      "Admin secret required",
+      "Refresh the page and enter the admin secret to use the panel."
+    );
+    renderSession();
+    return;
+  }
+
   endButton.disabled = true;
 
   try {
     await endSession();
   } catch (error) {
-    window.alert(error.message);
+    if (adminSecret) {
+      window.alert(error.message);
+    }
   } finally {
     renderSession();
   }
@@ -208,7 +331,17 @@ window.setInterval(() => {
   }
 }, 1000);
 
-loadSession().catch((error) => {
-  window.alert(error.message);
-});
+async function initializePanel() {
+  if (!ensureAdminSecret()) {
+    return;
+  }
 
+  await loadSession();
+}
+
+initializePanel().catch((error) => {
+  if (!panelMessage) {
+    setPanelMessage("Panel unavailable", error.message);
+    renderSession();
+  }
+});

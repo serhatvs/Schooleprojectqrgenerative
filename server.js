@@ -60,7 +60,7 @@ function hasValidScanPayload(payload) {
 }
 
 function getAttendanceLogsDir() {
-  return path.join(__dirname, "attendance_logs");
+  return process.env.ATTENDANCE_LOGS_DIR || "/app/attendance_logs";
 }
 
 function getSessionLogPath(sessionId) {
@@ -84,6 +84,164 @@ function requireAdminSecret(req, res, next) {
   }
 
   next();
+}
+
+function renderAdminBootstrapPage() {
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attendance QR Panel Access</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(23, 103, 255, 0.08), transparent 28%),
+          linear-gradient(180deg, #f7f9fb 0%, #f4f6f8 100%);
+        color: #162033;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+
+      .bootstrap-card {
+        width: min(100%, 420px);
+        padding: 28px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+        text-align: center;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.8rem;
+      }
+
+      p {
+        margin: 12px 0 0;
+        color: #667085;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="bootstrap-card">
+      <h1>Attendance QR Panel</h1>
+      <p id="bootstrap-message">Checking admin access...</p>
+    </main>
+    <script>
+      const messageElement = document.getElementById("bootstrap-message");
+
+      function showMessage(message) {
+        messageElement.textContent = message;
+      }
+
+      async function fetchProtectedText(pathname, secret) {
+        const response = await fetch(pathname, {
+          headers: { "x-admin-secret": secret },
+        });
+
+        return {
+          response,
+          text: await response.text(),
+        };
+      }
+
+      async function loadAdminPanel() {
+        const secret = window.prompt(
+          "Enter the admin secret to open the Attendance QR Panel."
+        );
+
+        if (!secret || !secret.trim()) {
+          showMessage(
+            "Admin secret is required. Refresh the page and enter the secret to continue."
+          );
+          return;
+        }
+
+        const trimmedSecret = secret.trim();
+
+        try {
+          const pageResult = await fetchProtectedText("/", trimmedSecret);
+
+          if (pageResult.response.status === 403) {
+            showMessage("The admin secret is missing or incorrect.");
+            return;
+          }
+
+          if (!pageResult.response.ok) {
+            showMessage("Failed to load the admin panel.");
+            return;
+          }
+
+          const [stylesResult, scriptResult] = await Promise.all([
+            fetchProtectedText("/styles.css", trimmedSecret),
+            fetchProtectedText("/app.js", trimmedSecret),
+          ]);
+
+          if (
+            stylesResult.response.status === 403 ||
+            scriptResult.response.status === 403
+          ) {
+            showMessage("The admin secret is missing or incorrect.");
+            return;
+          }
+
+          if (!stylesResult.response.ok || !scriptResult.response.ok) {
+            showMessage("Failed to load the admin panel.");
+            return;
+          }
+
+          const parser = new DOMParser();
+          const panelDocument = parser.parseFromString(
+            pageResult.text,
+            "text/html"
+          );
+          const stylesheetLink = panelDocument.querySelector(
+            'link[href="/styles.css"]'
+          );
+          const scriptTag = panelDocument.querySelector('script[src="/app.js"]');
+
+          if (stylesheetLink) {
+            const styleTag = panelDocument.createElement("style");
+            styleTag.textContent = stylesResult.text;
+            stylesheetLink.replaceWith(styleTag);
+          }
+
+          if (scriptTag) {
+            scriptTag.remove();
+          }
+
+          document.open();
+          document.write(
+            "<!DOCTYPE html>\n" + panelDocument.documentElement.outerHTML
+          );
+          document.close();
+
+          window.__ADMIN_SECRET = trimmedSecret;
+
+          const appScript = document.createElement("script");
+          appScript.text = scriptResult.text;
+          document.body.appendChild(appScript);
+        } catch (error) {
+          showMessage("Failed to load the admin panel.");
+        }
+      }
+
+      loadAdminPanel();
+    </script>
+  </body>
+</html>`;
 }
 
 function createSessionStore() {
@@ -215,15 +373,23 @@ function serializeSession(session) {
 function createApp() {
   const app = express();
   const store = createSessionStore();
+  const publicDir = path.join(__dirname, "public");
 
   app.use(express.json());
-  app.use(express.static(path.join(__dirname, "public")));
+
+  app.get("/admin", (req, res) => {
+    res.type("html").send(renderAdminBootstrapPage());
+  });
 
   app.get("/favicon.ico", (req, res) => {
     res.status(204).end();
   });
 
-  app.get("/api/session", (req, res) => {
+  app.get("/", requireAdminSecret, (req, res) => {
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
+
+  app.get("/api/session", requireAdminSecret, (req, res) => {
     res.json(serializeSession(store.get()));
   });
 
@@ -253,6 +419,8 @@ function createApp() {
       res.status(500).json({ status: "server_error" });
     }
   });
+
+  app.use(requireAdminSecret, express.static(publicDir, { index: false }));
 
   return app;
 }
