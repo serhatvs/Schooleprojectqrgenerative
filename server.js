@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const fs = require("node:fs");
 const path = require("node:path");
 
 const express = require("express");
@@ -55,6 +56,22 @@ function hasValidScanPayload(payload) {
     isNonEmptyString(payload?.wifi) &&
     isNonEmptyString(payload?.konum) &&
     isNonEmptyString(payload?.session_id)
+  );
+}
+
+function getAttendanceLogsDir() {
+  return path.join(__dirname, "attendance_logs");
+}
+
+function getSessionLogPath(sessionId) {
+  return path.join(getAttendanceLogsDir(), `session_${sessionId}.ndjson`);
+}
+
+function appendScanRecord(sessionId, record) {
+  fs.mkdirSync(getAttendanceLogsDir(), { recursive: true });
+  fs.appendFileSync(
+    getSessionLogPath(sessionId),
+    `${JSON.stringify(record)}\n`
   );
 }
 
@@ -125,8 +142,12 @@ function createSessionStore() {
         return { status: "invalid_qr" };
       }
 
-      if (!session.active || session.status === "expired") {
+      if (session.status === "expired") {
         return { status: "expired" };
+      }
+
+      if (!session.active) {
+        return { status: "invalid_qr" };
       }
 
       if (session.studentIds.has(payload.user_id)) {
@@ -137,16 +158,28 @@ function createSessionStore() {
         return { status: "duplicate_device" };
       }
 
-      session.studentIds.add(payload.user_id);
-      session.deviceIds.add(payload.device_install_id);
-      session.scanRecords.push({
+      const scanRecord = {
         user_id: payload.user_id,
         device_install_id: payload.device_install_id,
         scan_time: payload.scan_time,
         wifi: payload.wifi,
         konum: payload.konum,
-      });
-      console.log("SCAN:", payload.user_id, payload.device_install_id);
+        session_id: payload.session_id,
+      };
+
+      session.studentIds.add(payload.user_id);
+      session.deviceIds.add(payload.device_install_id);
+      session.scanRecords.push(scanRecord);
+
+      try {
+        appendScanRecord(session.session_id, scanRecord);
+      } catch (error) {
+        session.studentIds.delete(payload.user_id);
+        session.deviceIds.delete(payload.device_install_id);
+        session.scanRecords.pop();
+        console.error("Failed to persist attendance scan:", error);
+        throw error;
+      }
 
       return { status: "success" };
     },
@@ -154,7 +187,18 @@ function createSessionStore() {
 }
 
 function serializeSession(session) {
-  return session ? { ...session } : null;
+  if (!session) {
+    return null;
+  }
+
+  return {
+    session_id: session.session_id,
+    start_time: session.start_time,
+    expires_at: session.expires_at,
+    active: session.active,
+    status: session.status,
+    qr_data_url: session.qr_data_url,
+  };
 }
 
 function createApp() {
@@ -192,7 +236,11 @@ function createApp() {
   });
 
   app.post("/api/attendance/scan", (req, res) => {
-    res.json(store.recordScan(req.body));
+    try {
+      res.json(store.recordScan(req.body));
+    } catch (error) {
+      res.status(500).json({ status: "server_error" });
+    }
   });
 
   return app;
