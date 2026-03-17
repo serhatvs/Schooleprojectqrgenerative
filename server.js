@@ -36,7 +36,26 @@ async function buildSession() {
     active: true,
     status: "active",
     qr_data_url: qrDataUrl,
+    studentIds: new Set(),
+    deviceIds: new Set(),
+    scanRecords: [],
   };
+}
+
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasValidScanPayload(payload) {
+  return (
+    isNonEmptyString(payload?.user_id) &&
+    isNonEmptyString(payload?.device_install_id) &&
+    isNonEmptyString(payload?.device_install_password) &&
+    isNonEmptyString(payload?.scan_time) &&
+    isNonEmptyString(payload?.wifi) &&
+    isNonEmptyString(payload?.konum) &&
+    isNonEmptyString(payload?.session_id)
+  );
 }
 
 function createSessionStore() {
@@ -95,6 +114,42 @@ function createSessionStore() {
 
       return currentSession;
     },
+    recordScan(payload) {
+      const session = normalizeSession();
+
+      if (
+        !session ||
+        !hasValidScanPayload(payload) ||
+        payload.session_id !== session.session_id
+      ) {
+        return { status: "invalid_qr" };
+      }
+
+      if (!session.active || session.status === "expired") {
+        return { status: "expired" };
+      }
+
+      if (session.studentIds.has(payload.user_id)) {
+        return { status: "duplicate_student" };
+      }
+
+      if (session.deviceIds.has(payload.device_install_id)) {
+        return { status: "duplicate_device" };
+      }
+
+      session.studentIds.add(payload.user_id);
+      session.deviceIds.add(payload.device_install_id);
+      session.scanRecords.push({
+        user_id: payload.user_id,
+        device_install_id: payload.device_install_id,
+        scan_time: payload.scan_time,
+        wifi: payload.wifi,
+        konum: payload.konum,
+      });
+      console.log("SCAN:", payload.user_id, payload.device_install_id);
+
+      return { status: "success" };
+    },
   };
 }
 
@@ -134,6 +189,10 @@ function createApp() {
 
   app.post("/api/session/end", (req, res) => {
     res.json(serializeSession(store.end()));
+  });
+
+  app.post("/api/attendance/scan", (req, res) => {
+    res.json(store.recordScan(req.body));
   });
 
   return app;

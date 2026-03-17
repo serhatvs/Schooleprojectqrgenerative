@@ -34,3 +34,4 @@ Then open `http://localhost:3000`.
 - The server turns that payload into a QR image and sends it to the page as a data URL.
 - `End Session` marks the session inactive and removes the visible QR.
 - If the session passes its expiration time, both server and client treat it as expired and hide the QR.
+- `POST /api/attendance/scan` accepts mobile scan requests and returns `success`, `expired`, `duplicate_student`, `duplicate_device`, or `invalid_qr`.
