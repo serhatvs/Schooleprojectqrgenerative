@@ -222,10 +222,11 @@ function renderAdminBootstrapPage() {
             scriptTag.remove();
           }
 
+          const hydratedHtml =
+            "<!DOCTYPE html>" + panelDocument.documentElement.outerHTML;
+
           document.open();
-          document.write(
-            "<!DOCTYPE html>\n" + panelDocument.documentElement.outerHTML
-          );
+          document.write(hydratedHtml);
           document.close();
 
           window.__ADMIN_SECRET = trimmedSecret;
