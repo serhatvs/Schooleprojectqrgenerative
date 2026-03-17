@@ -75,6 +75,17 @@ function appendScanRecord(sessionId, record) {
   );
 }
 
+function requireAdminSecret(req, res, next) {
+  const secret = req.headers["x-admin-secret"];
+
+  if (!secret || secret !== process.env.ADMIN_SECRET) {
+    console.log("Unauthorized admin access attempt:", req.method, req.path);
+    return res.status(403).json({ error: "unauthorized" });
+  }
+
+  next();
+}
+
 function createSessionStore() {
   let currentSession = null;
 
@@ -216,7 +227,7 @@ function createApp() {
     res.json(serializeSession(store.get()));
   });
 
-  app.post("/api/session/start", async (req, res) => {
+  app.post("/api/session/start", requireAdminSecret, async (req, res) => {
     try {
       const replaceActive = Boolean(req.body?.replaceActive);
       const session = await store.start(replaceActive);
@@ -231,7 +242,7 @@ function createApp() {
     }
   });
 
-  app.post("/api/session/end", (req, res) => {
+  app.post("/api/session/end", requireAdminSecret, (req, res) => {
     res.json(serializeSession(store.end()));
   });
 
