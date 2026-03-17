@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attendance QR Panel</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="panel" aria-labelledby="panel-title">
+        <div class="panel-header">
+          <p class="eyebrow">Attendance</p>
+          <h1 id="panel-title">Attendance QR Panel</h1>
+          <p class="subtle-copy">
+            Start one active attendance session and show its QR code on screen.
+          </p>
+        </div>
+
+        <div class="qr-card" aria-live="polite">
+          <img
+            id="qr-image"
+            class="qr-image"
+            alt="Attendance session QR code"
+            hidden
+          />
+          <div id="qr-placeholder" class="qr-placeholder">
+            <p id="placeholder-title" class="placeholder-title">
+              No active session
+            </p>
+            <p id="placeholder-copy" class="placeholder-copy">
+              Start a session to generate a QR code.
+            </p>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="start-button" class="button button-primary" type="button">
+            Start Session
+          </button>
+          <button id="end-button" class="button button-secondary" type="button">
+            End Session
+          </button>
+        </div>
+
+        <dl class="session-details">
+          <div class="detail-row">
+            <dt>Session ID</dt>
+            <dd id="session-id">-</dd>
+          </div>
+          <div class="detail-row">
+            <dt>Start Time</dt>
+            <dd id="start-time">-</dd>
+          </div>
+          <div class="detail-row">
+            <dt>Expiration Time</dt>
+            <dd id="expiration-time">-</dd>
+          </div>
+          <div class="detail-row">
+            <dt>Status</dt>
+            <dd>
+              <span id="status-badge" class="status-badge status-idle">
+                Not started
+              </span>
+            </dd>
+          </div>
+        </dl>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

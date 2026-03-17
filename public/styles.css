@@ -1,0 +1,259 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f6f8;
+  --panel: rgba(255, 255, 255, 0.96);
+  --panel-border: rgba(15, 23, 42, 0.08);
+  --text: #162033;
+  --muted: #667085;
+  --primary: #1767ff;
+  --primary-hover: #1152ca;
+  --secondary-bg: #eef2f7;
+  --secondary-hover: #e1e8f0;
+  --success-bg: #e5f4eb;
+  --success-text: #166534;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --idle-bg: #eef2f6;
+  --idle-text: #475467;
+  --shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top, rgba(23, 103, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, #f7f9fb 0%, var(--bg) 100%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.page-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.panel {
+  width: min(100%, 560px);
+  padding: 32px;
+  border-radius: 24px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow);
+}
+
+.panel-header {
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  line-height: 1.15;
+}
+
+.subtle-copy {
+  margin: 12px auto 0;
+  max-width: 36ch;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.qr-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 340px;
+  margin-top: 28px;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.qr-image {
+  width: min(100%, 320px);
+  height: auto;
+  display: block;
+}
+
+.qr-placeholder {
+  width: 100%;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  border: 1.5px dashed rgba(15, 23, 42, 0.12);
+  border-radius: 18px;
+  background: rgba(244, 246, 248, 0.65);
+}
+
+.placeholder-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.placeholder-copy {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.button {
+  flex: 1;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.button-primary {
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.button-primary:hover {
+  background: var(--primary-hover);
+}
+
+.button-secondary {
+  color: var(--text);
+  background: var(--secondary-bg);
+}
+
+.button-secondary:hover {
+  background: var(--secondary-hover);
+}
+
+.session-details {
+  margin: 24px 0 0;
+  padding: 0;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.detail-row:last-child {
+  border-bottom: 0;
+}
+
+dt {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 106px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+
+.status-active {
+  color: var(--success-text);
+  background: var(--success-bg);
+}
+
+.status-expired {
+  color: var(--warning-text);
+  background: var(--warning-bg);
+}
+
+.status-ended,
+.status-idle {
+  color: var(--idle-text);
+  background: var(--idle-bg);
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 24px;
+    border-radius: 20px;
+  }
+
+  .qr-card {
+    min-height: 290px;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .detail-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  dd {
+    text-align: left;
+  }
+}

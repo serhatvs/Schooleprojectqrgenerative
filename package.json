@@ -1,0 +1,14 @@
+{
+  "name": "attendance-qr-mvp",
+  "version": "1.0.0",
+  "description": "Minimal attendance QR generation MVP",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "qrcode": "^1.5.4"
+  }
+}
