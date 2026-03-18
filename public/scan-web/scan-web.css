@@ -65,10 +65,8 @@ input {
 }
 
 h1,
-h2,
 .subtle-copy,
-.camera-panel-header p,
-.scanner-placeholder,
+.page-note,
 .field span,
 .result-banner {
   margin: 0;
@@ -80,9 +78,20 @@ h1 {
 }
 
 .subtle-copy,
-.camera-panel-header p {
+.page-note {
   color: var(--muted);
   line-height: 1.5;
+}
+
+.helper-copy {
+  margin: -4px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.attendance-form {
+  display: grid;
+  gap: 14px;
 }
 
 .field {
@@ -90,8 +99,7 @@ h1 {
   gap: 8px;
 }
 
-.field span,
-.camera-panel-header h2 {
+.field span {
   font-weight: 600;
 }
 
@@ -125,50 +133,28 @@ h1 {
   cursor: default;
 }
 
-.camera-panel {
-  display: grid;
-  gap: 10px;
+.secondary-button {
+  min-height: 52px;
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  border-radius: 16px;
+  background: rgba(15, 118, 110, 0.06);
+  color: var(--primary-strong);
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.camera-panel-header {
-  display: grid;
-  gap: 4px;
+.secondary-button:disabled {
+  opacity: 0.65;
+  cursor: default;
 }
 
-.scanner-shell {
-  display: grid;
-  place-items: center;
-  min-height: 320px;
-  padding: 12px;
-  border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(15, 118, 110, 0.04) 0%, rgba(15, 118, 110, 0.08) 100%);
-  border: 1px solid rgba(15, 118, 110, 0.12);
+.gallery-decoder {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   overflow: hidden;
-}
-
-.scanner-reader {
-  width: 100%;
-}
-
-.scanner-reader video {
-  width: 100% !important;
-  height: auto !important;
-  border-radius: 18px;
-}
-
-.scanner-reader > div {
-  border: 0 !important;
-}
-
-.scanner-reader img {
-  display: none !important;
-}
-
-.scanner-placeholder {
-  text-align: center;
-  color: var(--muted);
-  line-height: 1.5;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .result-banner {
@@ -206,9 +192,5 @@ h1 {
   .scanner-card {
     padding: 20px;
     border-radius: 20px;
-  }
-
-  .scanner-shell {
-    min-height: 280px;
   }
 }

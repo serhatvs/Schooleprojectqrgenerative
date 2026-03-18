@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Genel QR Görüntüleme</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/public-qr/public-qr.css" />
+    <script src="/public-qr/public-qr.js" defer></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="qr-card">
+        <p class="eyebrow">Genel Görünüm</p>
+        <h1>Aktif Yoklama QR Kodu</h1>
+        <p class="subtle-copy">
+          Bu ekran yalnızca görüntüleme içindir. Sayfa kendini otomatik yeniler.
+        </p>
+
+        <p id="status-message" class="status-message" aria-live="polite">
+          QR bilgisi yükleniyor...
+        </p>
+
+        <div class="qr-shell">
+          <img id="qr-image" class="qr-image" alt="Aktif yoklama QR kodu" hidden />
+          <p id="empty-state" class="empty-state">
+            Şu anda gösterilecek aktif QR bulunmuyor.
+          </p>
+        </div>
+
+        <dl class="detail-list">
+          <div class="detail-row">
+            <dt>Durum</dt>
+            <dd id="status-value">-</dd>
+          </div>
+          <div class="detail-row">
+            <dt>Yoklama Kodu</dt>
+            <dd id="session-id-value">-</dd>
+          </div>
+          <div class="detail-row">
+            <dt>Bitiş Zamanı</dt>
+            <dd id="expires-at-value">-</dd>
+          </div>
+        </dl>
+      </section>
+    </main>
+  </body>
+</html>

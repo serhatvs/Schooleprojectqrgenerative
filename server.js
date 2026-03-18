@@ -39,6 +39,8 @@ const SCHOOL_LONGITUDE = 35.47434393140808;
 const SCHOOL_RADIUS_METERS = 600;
 const XLSX_CONTENT_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const FALLBACK_PUBLIC_ORIGIN =
+  "https://schooleprojectqrgenerative-production.up.railway.app";
 
 function createActiveSessionError(session) {
   const error = new Error("An active session already exists.");
@@ -51,18 +53,97 @@ function toIsoString(value) {
   return new Date(value).toISOString();
 }
 
-async function createQrDataUrl(sessionId) {
-  const qrPayload = {
-    session_id: sessionId,
-    timestamp: new Date().toISOString(),
-    nonce: crypto.randomBytes(12).toString("hex"),
-  };
+function normalizeBaseOrigin(baseOrigin) {
+  return String(baseOrigin || FALLBACK_PUBLIC_ORIGIN).replace(/\/+$/, "");
+}
 
-  return QRCode.toDataURL(JSON.stringify(qrPayload), {
+function buildScanWebQrValue(baseOrigin, sessionId) {
+  return `${normalizeBaseOrigin(baseOrigin)}/scan-web?session_id=${encodeURIComponent(sessionId)}`;
+}
+
+async function buildQrDataUrlFromValue(qrValue) {
+  return QRCode.toDataURL(qrValue, {
     errorCorrectionLevel: "M",
     margin: 1,
     width: 420,
   });
+}
+
+async function createQrDataUrl(sessionId) {
+  return buildQrDataUrlFromValue(
+    buildScanWebQrValue(FALLBACK_PUBLIC_ORIGIN, sessionId)
+  );
+}
+
+function getRequestOrigin(req) {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const forwardedHost = req.headers["x-forwarded-host"];
+  const proto = Array.isArray(forwardedProto)
+    ? forwardedProto[0]
+    : String(forwardedProto || "").split(",")[0].trim();
+  const host = Array.isArray(forwardedHost)
+    ? forwardedHost[0]
+    : String(forwardedHost || "").split(",")[0].trim();
+
+  if (proto && host) {
+    return normalizeBaseOrigin(`${proto}://${host}`);
+  }
+
+  const requestHost = req.get("host");
+
+  if (requestHost) {
+    return normalizeBaseOrigin(`${req.protocol}://${requestHost}`);
+  }
+
+  return normalizeBaseOrigin(FALLBACK_PUBLIC_ORIGIN);
+}
+
+function serializeCurrentQrState(session, baseOrigin) {
+  if (!session) {
+    return {
+      status: "idle",
+      session_id: null,
+      expires_at: null,
+      qr_value: null,
+      qr_data_url: null,
+    };
+  }
+
+  const expiresAt = session.expires_at ?? null;
+  const expiresAtMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const isExpired =
+    session.status === "expired" ||
+    (Number.isFinite(expiresAtMs) && Date.now() >= expiresAtMs);
+
+  if (isExpired) {
+    return {
+      status: "expired",
+      session_id: session.session_id ?? null,
+      expires_at: expiresAt,
+      qr_value: null,
+      qr_data_url: null,
+    };
+  }
+
+  if (session.active && session.status === "active") {
+    const qrValue = buildScanWebQrValue(baseOrigin, session.session_id);
+
+    return {
+      status: "active",
+      session_id: session.session_id,
+      expires_at: expiresAt,
+      qr_value: qrValue,
+      qr_data_url: null,
+    };
+  }
+
+  return {
+    status: "idle",
+    session_id: null,
+    expires_at: null,
+    qr_value: null,
+    qr_data_url: null,
+  };
 }
 
 async function buildSession() {
@@ -437,6 +518,9 @@ function createSessionStore() {
     async get() {
       return normalizeSession();
     },
+    peek() {
+      return currentSession;
+    },
     restore(session) {
       currentSession = session;
     },
@@ -764,6 +848,7 @@ function createApp() {
   const app = express();
   const store = createSessionStore();
   const publicDir = path.join(__dirname, "public");
+  const publicQrDir = path.join(publicDir, "public-qr");
   const scanWebDir = path.join(publicDir, "scan-web");
   const scanWebBundlePath = path.join(
     __dirname,
@@ -787,6 +872,10 @@ function createApp() {
     res.sendFile(path.join(scanWebDir, "index.html"));
   });
 
+  app.get(["/public-qr", "/public-qr/"], (req, res) => {
+    res.sendFile(path.join(publicQrDir, "index.html"));
+  });
+
   app.get("/sw.js", (req, res) => {
     res.setHeader("Service-Worker-Allowed", "/scan-web");
     res.type("application/javascript").sendFile(path.join(scanWebDir, "sw.js"));
@@ -800,9 +889,28 @@ function createApp() {
   });
 
   app.use("/scan-web", express.static(scanWebDir, { index: false }));
+  app.use("/public-qr", express.static(publicQrDir, { index: false }));
 
   app.get("/", requireAdminSecret, (req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
+  });
+
+  app.get("/api/session/current-qr", async (req, res) => {
+    try {
+      const snapshot = serializeCurrentQrState(store.peek(), getRequestOrigin(req));
+
+      if (snapshot.status !== "active" || !snapshot.qr_value) {
+        return res.json(snapshot);
+      }
+
+      res.json({
+        ...snapshot,
+        qr_data_url: await buildQrDataUrlFromValue(snapshot.qr_value),
+      });
+    } catch (error) {
+      console.error("Failed to load current QR session:", error);
+      res.status(500).json({ error: "server_error" });
+    }
   });
 
   app.get("/api/session", requireAdminSecret, async (req, res) => {

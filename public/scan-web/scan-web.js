@@ -5,38 +5,37 @@ const STORAGE_KEYS = {
 };
 
 const RESULT_MESSAGES = {
-  success: { text: "Yoklama basariyla alindi", tone: "success" },
-  expired: { text: "Yoklama suresi dolmus", tone: "warning" },
+  success: { text: "Yoklama başarıyla alındı", tone: "success" },
+  expired: { text: "Yoklama süresi dolmuş", tone: "warning" },
   duplicate_student: { text: "Zaten yoklama verdiniz", tone: "warning" },
-  duplicate_device: { text: "Bu cihaz zaten kullanildi", tone: "warning" },
-  invalid_qr: { text: "Gecersiz QR", tone: "danger" },
-  unreadable_qr: { text: "QR okunamadi", tone: "danger" },
-  missing_user_id: { text: "Ogrenci numarasi giriniz", tone: "warning" },
+  duplicate_device: { text: "Bu cihaz zaten kullanıldı", tone: "warning" },
+  invalid_qr: { text: "Geçersiz bağlantı", tone: "danger" },
+  invalid_gallery_qr: { text: "Geçersiz QR", tone: "danger" },
+  unreadable_qr: { text: "QR okunamadı", tone: "danger" },
+  missing_user_id: { text: "Öğrenci numarası giriniz", tone: "warning" },
   location_required: { text: "Konum izni gerekli", tone: "warning" },
-  camera_error: { text: "Kamera acilamadi", tone: "danger" },
-  server_error: { text: "Sunucuya ulasilamadi", tone: "danger" },
-  ready: { text: "Tarayici hazir.", tone: "idle" },
-  starting: { text: "Kamera baslatiliyor...", tone: "idle" },
-  getting_location: { text: "Konum aliniyor...", tone: "idle" },
+  sending: { text: "Yoklama gönderiliyor...", tone: "idle" },
+  getting_location: { text: "Konum alınıyor...", tone: "idle" },
+  reading_qr: { text: "QR okunuyor...", tone: "idle" },
+  ready: { text: "Yoklama bağlantısı hazır", tone: "idle" },
+  gallery_ready: { text: "Devam etmek için galeriden QR seçin", tone: "idle" },
+  server_error: { text: "Sunucuya ulaşılamadı", tone: "danger" },
 };
+
 const LOCATION_REQUIRED_ERROR = "Konum izni gerekli";
-
-const RESUME_DELAY_MS = 3000;
-const scannerReader = document.getElementById("scanner-reader");
-const scannerPlaceholder = document.getElementById("scanner-placeholder");
-const startButton = document.getElementById("start-button");
 const userIdInput = document.getElementById("user-id-input");
+const submitButton = document.getElementById("submit-button");
 const resultBanner = document.getElementById("result-banner");
+const pageNote = document.getElementById("page-note");
+const attendanceForm = document.getElementById("attendance-form");
+const galleryButton = document.getElementById("gallery-button");
+const galleryInput = document.getElementById("gallery-input");
+const galleryHint = document.getElementById("gallery-hint");
 
-let scanner = null;
-let isScannerRunning = false;
-let isProcessing = false;
-let resumeTimer = null;
-let shouldAutoResume = false;
-
-function syncStartButton() {
-  startButton.disabled = isScannerRunning;
-}
+let sessionId = "";
+let isSubmitting = false;
+let isDecoding = false;
+let qrDecoder = null;
 
 function createFallbackUuid() {
   const bytes = getRandomBytes(16);
@@ -124,21 +123,20 @@ function persistUserId() {
   setStorageItem(STORAGE_KEYS.userId, userIdInput.value.trim());
 }
 
-function setScannerVisible(isVisible) {
-  scannerReader.hidden = !isVisible;
-  scannerPlaceholder.hidden = isVisible;
-}
-
 function setResult(message, tone) {
   resultBanner.textContent = message;
   resultBanner.className = `result-banner result-${tone}`;
 }
 
-function clearResumeTimer() {
-  if (resumeTimer) {
-    window.clearTimeout(resumeTimer);
-    resumeTimer = null;
-  }
+function syncUi() {
+  const hasSessionId = Boolean(sessionId);
+  const isBusy = isSubmitting || isDecoding;
+
+  userIdInput.disabled = isBusy;
+  submitButton.disabled = isBusy || !hasSessionId;
+  galleryButton.hidden = hasSessionId;
+  galleryHint.hidden = hasSessionId;
+  galleryButton.disabled = isBusy || hasSessionId;
 }
 
 function getCurrentUserId() {
@@ -147,6 +145,103 @@ function getCurrentUserId() {
 
 function getStatusMessage(status) {
   return RESULT_MESSAGES[status] ?? RESULT_MESSAGES.server_error;
+}
+
+function getSessionIdFromQuery() {
+  const value = new URLSearchParams(window.location.search).get("session_id");
+
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim();
+}
+
+function setSessionId(nextSessionId, source) {
+  sessionId = nextSessionId;
+
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("session_id", nextSessionId);
+  window.history.replaceState({}, "", nextUrl);
+
+  pageNote.textContent =
+    source === "gallery"
+      ? "QR çözüldü. Öğrenci numaranızı girip yoklamayı gönderebilirsiniz."
+      : "Bağlantı açıldıktan sonra konum izni vererek yoklamanızı gönderebilirsiniz.";
+
+  setResult(RESULT_MESSAGES.ready.text, RESULT_MESSAGES.ready.tone);
+  syncUi();
+  userIdInput.focus();
+}
+
+function extractSessionIdFromUrl(decodedText) {
+  try {
+    const parsedUrl = new URL(decodedText);
+    const parsedSessionId = parsedUrl.searchParams.get("session_id");
+
+    return typeof parsedSessionId === "string" ? parsedSessionId.trim() : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function extractSessionIdFromJson(decodedText) {
+  try {
+    const parsedJson = JSON.parse(decodedText);
+
+    return typeof parsedJson?.session_id === "string"
+      ? parsedJson.session_id.trim()
+      : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function extractSessionIdFromDecodedText(decodedText) {
+  const normalizedText = typeof decodedText === "string" ? decodedText.trim() : "";
+
+  if (!normalizedText) {
+    return { error: RESULT_MESSAGES.unreadable_qr };
+  }
+
+  const sessionIdFromUrl = extractSessionIdFromUrl(normalizedText);
+
+  if (sessionIdFromUrl) {
+    return { sessionId: sessionIdFromUrl };
+  }
+
+  const sessionIdFromJson = extractSessionIdFromJson(normalizedText);
+
+  if (sessionIdFromJson) {
+    return { sessionId: sessionIdFromJson };
+  }
+
+  return { error: RESULT_MESSAGES.invalid_gallery_qr };
+}
+
+async function getQrDecoder() {
+  if (!qrDecoder) {
+    qrDecoder = new Html5Qrcode("gallery-decoder");
+  }
+
+  return qrDecoder;
+}
+
+async function decodeQrFromImage(file) {
+  const decoder = await getQrDecoder();
+
+  try {
+    const decodedText = await decoder.scanFile(file, false);
+    return extractSessionIdFromDecodedText(decodedText);
+  } catch (error) {
+    return { error: RESULT_MESSAGES.unreadable_qr };
+  } finally {
+    try {
+      await decoder.clear();
+    } catch (error) {
+      // Ignore cleanup errors from scanFile decoding.
+    }
+  }
 }
 
 function getCurrentPosition() {
@@ -179,62 +274,48 @@ async function getKonum() {
   }
 }
 
-function extractSessionIdFromQr(decodedText) {
-  let parsedQr;
+async function submitAttendanceWithKonum(konum) {
+  const { deviceInstallId, deviceInstallPassword } = ensureDeviceCredentials();
+  let response;
 
   try {
-    parsedQr = JSON.parse(decodedText);
+    response = await fetch(`${window.location.origin}/api/attendance/scan`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: getCurrentUserId(),
+        device_install_id: deviceInstallId,
+        device_install_password: deviceInstallPassword,
+        scan_time: new Date().toISOString(),
+        konum,
+        session_id: sessionId,
+      }),
+    });
   } catch (error) {
-    return { error: RESULT_MESSAGES.unreadable_qr };
+    return RESULT_MESSAGES.server_error;
   }
 
-  if (typeof parsedQr?.session_id !== "string" || !parsedQr.session_id.trim()) {
-    return { error: RESULT_MESSAGES.invalid_qr };
+  const data = await response.json().catch(() => ({ status: "server_error" }));
+
+  if (!response.ok) {
+    return RESULT_MESSAGES.server_error;
   }
 
-  return { sessionId: parsedQr.session_id.trim() };
+  return getStatusMessage(data?.status);
 }
 
-async function stopScanner() {
-  clearResumeTimer();
+async function handleSubmit(event) {
+  event.preventDefault();
 
-  if (!scanner || !isScannerRunning) {
-    setScannerVisible(false);
-    syncStartButton();
+  if (isSubmitting || isDecoding || !sessionId) {
     return;
   }
 
-  try {
-    await scanner.stop();
-  } catch (error) {
-    console.warn("Failed to stop scanner cleanly:", error);
-  } finally {
-    isScannerRunning = false;
-    setScannerVisible(false);
-    syncStartButton();
-  }
-}
+  const userId = getCurrentUserId();
 
-function chooseCamera(cameras) {
-  if (!Array.isArray(cameras) || cameras.length === 0) {
-    return null;
-  }
-
-  const preferredCamera = cameras.find((camera) =>
-    /back|rear|environment/i.test(camera.label)
-  );
-
-  return preferredCamera?.id ?? cameras[0].id;
-}
-
-async function startScanner() {
-  if (isScannerRunning || isProcessing) {
-    return;
-  }
-
-  const currentUserId = getCurrentUserId();
-
-  if (!currentUserId) {
+  if (!userId) {
     setResult(
       RESULT_MESSAGES.missing_user_id.text,
       RESULT_MESSAGES.missing_user_id.tone
@@ -244,142 +325,17 @@ async function startScanner() {
   }
 
   persistUserId();
-  ensureDeviceCredentials();
-  clearResumeTimer();
-  shouldAutoResume = true;
-  startButton.disabled = true;
-  setResult(RESULT_MESSAGES.starting.text, RESULT_MESSAGES.starting.tone);
-
-  if (!scanner) {
-    scanner = new Html5Qrcode("scanner-reader");
-  }
+  isSubmitting = true;
+  syncUi();
+  setResult(
+    RESULT_MESSAGES.getting_location.text,
+    RESULT_MESSAGES.getting_location.tone
+  );
 
   try {
-    setScannerVisible(true);
-
-    try {
-      await scanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 220, height: 220 },
-          aspectRatio: 1,
-        },
-        handleScanSuccess,
-        () => {}
-      );
-    } catch (primaryError) {
-      const cameras = await Html5Qrcode.getCameras();
-      const cameraId = chooseCamera(cameras);
-
-      if (!cameraId) {
-        throw primaryError;
-      }
-
-      await scanner.start(
-        cameraId,
-        {
-          fps: 10,
-          qrbox: { width: 220, height: 220 },
-          aspectRatio: 1,
-        },
-        handleScanSuccess,
-        () => {}
-      );
-    }
-
-    isScannerRunning = true;
-    syncStartButton();
-    setResult(RESULT_MESSAGES.ready.text, RESULT_MESSAGES.ready.tone);
-  } catch (error) {
-    console.error("Failed to start scanner:", error);
-    shouldAutoResume = false;
-    isScannerRunning = false;
-    setScannerVisible(false);
-    syncStartButton();
-    setResult(RESULT_MESSAGES.camera_error.text, RESULT_MESSAGES.camera_error.tone);
-  } finally {
-    syncStartButton();
-  }
-}
-
-function resumeScanningSoon() {
-  clearResumeTimer();
-
-  if (!shouldAutoResume) {
-    isProcessing = false;
-    return;
-  }
-
-  resumeTimer = window.setTimeout(async () => {
-    if (document.hidden) {
-      isProcessing = false;
-      return;
-    }
-
-    isProcessing = false;
-    await startScanner();
-  }, RESUME_DELAY_MS);
-}
-
-async function submitAttendance(sessionId, konum) {
-  const { deviceInstallId, deviceInstallPassword } = ensureDeviceCredentials();
-
-  const response = await fetch(`${window.location.origin}/api/attendance/scan`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      user_id: getCurrentUserId(),
-      device_install_id: deviceInstallId,
-      device_install_password: deviceInstallPassword,
-      scan_time: new Date().toISOString(),
-      konum,
-      session_id: sessionId,
-    }),
-  });
-
-  const data = await response
-    .json()
-    .catch(() => ({ status: "server_error" }));
-
-  if (!response.ok) {
-    return RESULT_MESSAGES.server_error;
-  }
-
-  return getStatusMessage(data?.status);
-}
-
-async function processDecodedText(decodedText) {
-  await stopScanner();
-
-  const userId = getCurrentUserId();
-
-  if (!userId) {
-    setResult(
-      RESULT_MESSAGES.missing_user_id.text,
-      RESULT_MESSAGES.missing_user_id.tone
-    );
-    resumeScanningSoon();
-    return;
-  }
-
-  const qrResult = extractSessionIdFromQr(decodedText);
-
-  if (qrResult.error) {
-    setResult(qrResult.error.text, qrResult.error.tone);
-    resumeScanningSoon();
-    return;
-  }
-
-  try {
-    setResult(
-      RESULT_MESSAGES.getting_location.text,
-      RESULT_MESSAGES.getting_location.tone
-    );
     const konum = await getKonum();
-    const outcome = await submitAttendance(qrResult.sessionId, konum);
+    setResult(RESULT_MESSAGES.sending.text, RESULT_MESSAGES.sending.tone);
+    const outcome = await submitAttendanceWithKonum(konum);
     setResult(outcome.text, outcome.tone);
   } catch (error) {
     if (error instanceof Error && error.message === LOCATION_REQUIRED_ERROR) {
@@ -394,18 +350,37 @@ async function processDecodedText(decodedText) {
         RESULT_MESSAGES.server_error.tone
       );
     }
+  } finally {
+    isSubmitting = false;
+    syncUi();
   }
-
-  resumeScanningSoon();
 }
 
-function handleScanSuccess(decodedText) {
-  if (isProcessing) {
+async function handleGalleryInputChange() {
+  const file = galleryInput.files?.[0];
+
+  if (!file || isDecoding || sessionId) {
     return;
   }
 
-  isProcessing = true;
-  void processDecodedText(decodedText);
+  isDecoding = true;
+  syncUi();
+  setResult(RESULT_MESSAGES.reading_qr.text, RESULT_MESSAGES.reading_qr.tone);
+
+  try {
+    const qrResult = await decodeQrFromImage(file);
+
+    if (qrResult.error) {
+      setResult(qrResult.error.text, qrResult.error.tone);
+      return;
+    }
+
+    setSessionId(qrResult.sessionId, "gallery");
+  } finally {
+    isDecoding = false;
+    galleryInput.value = "";
+    syncUi();
+  }
 }
 
 function registerServiceWorker() {
@@ -420,32 +395,38 @@ function registerServiceWorker() {
   });
 }
 
-function handleVisibilityChange() {
-  if (!document.hidden || !shouldAutoResume || isProcessing || isScannerRunning) {
+function initPage() {
+  sessionId = getSessionIdFromQuery();
+  loadStoredUserId();
+  ensureDeviceCredentials();
+
+  if (!sessionId) {
+    pageNote.textContent = "QR kodu ekran görüntüsü alıp galeriden seçebilirsiniz.";
+    setResult(
+      RESULT_MESSAGES.gallery_ready.text,
+      RESULT_MESSAGES.gallery_ready.tone
+    );
+    syncUi();
+    userIdInput.focus();
     return;
   }
 
-  void startScanner();
-}
-
-function handlePageHide() {
-  shouldAutoResume = false;
-  void stopScanner();
+  setSessionId(sessionId, "query");
 }
 
 function init() {
-  loadStoredUserId();
-  ensureDeviceCredentials();
-  setResult(RESULT_MESSAGES.ready.text, RESULT_MESSAGES.ready.tone);
-  syncStartButton();
-
   userIdInput.addEventListener("input", persistUserId);
-  startButton.addEventListener("click", () => {
-    void startScanner();
+  attendanceForm.addEventListener("submit", (event) => {
+    void handleSubmit(event);
   });
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-  window.addEventListener("pagehide", handlePageHide);
+  galleryButton.addEventListener("click", () => {
+    galleryInput.click();
+  });
+  galleryInput.addEventListener("change", () => {
+    void handleGalleryInputChange();
+  });
 
+  initPage();
   registerServiceWorker();
 }
 

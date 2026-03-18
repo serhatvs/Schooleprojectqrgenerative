@@ -6,8 +6,10 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
 
 - `/admin` is the admin panel.
 - `/scan-web` is the public iOS-compatible web scanner and PWA entry.
+- `/public-qr` is the public read-only QR display page.
 - `POST /api/attendance/scan` is the public student scan endpoint.
 - Session management endpoints remain unchanged and stay admin-protected.
+- `GET /api/session/current-qr` is the public read-only current QR endpoint.
 - Attendance reporting endpoints remain admin-protected:
   - `GET /api/attendance/daily-view?date=YYYY-MM-DD`
   - `GET /api/attendance/monthly-view?month=YYYY-MM`
@@ -24,8 +26,8 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
 
 - The server keeps only one session in memory.
 - `Start Session` creates a random `session_id`, current `start_time`, `expires_at` 3 hours later, and marks the session as active.
-- The QR payload is encoded as JSON with `session_id`, `timestamp`, and `nonce`.
-- The server turns that payload into a QR image and sends it to the page as a data URL.
+- The QR content is a direct web link in the format `https://schooleprojectqrgenerative-production.up.railway.app/scan-web?session_id=<session_id>`.
+- The server turns that web link into a QR image and sends it to the page as a data URL.
 - Session metadata is synchronized into PostgreSQL and the latest valid active session is restored on startup.
 - `End Session` marks the session inactive in memory and in PostgreSQL.
 - `POST /api/attendance/scan` persists attendance to PostgreSQL and returns `success`, `expired`, `duplicate_student`, `duplicate_device`, or `invalid_qr`.
@@ -77,6 +79,7 @@ Production URLs:
 
 - Backend base URL: `https://schooleprojectqrgenerative-production.up.railway.app`
 - Admin panel: `https://schooleprojectqrgenerative-production.up.railway.app/admin`
+- Public QR page: `https://schooleprojectqrgenerative-production.up.railway.app/public-qr`
 
 ## How To Use
 
@@ -91,6 +94,13 @@ Admin:
 
 Dashboard export buttons download XLSX files by default. Legacy CSV endpoints remain available for manual use.
 
+Read-only QR viewing:
+
+1. Open `/public-qr` to show the current QR without entering the admin panel.
+2. Or call `GET /api/session/current-qr` to fetch the current session QR as JSON.
+3. Both are read-only and do not start, end, or modify sessions.
+4. This access is public because the project does not currently use a separate view secret.
+
 Student / mobile scanner:
 
 1. Open the mobile scanner app configured with the production backend URL.
@@ -101,20 +111,24 @@ Student / mobile scanner:
 
 Student / web scanner / PWA:
 
-1. Open `/scan-web` on the same HTTPS backend origin.
-2. Enter the student `user_id`.
-3. Tap `Tarayiciyi Baslat` and allow camera access.
-4. Scan the active QR code from the admin panel.
+1. Scan the active QR code from the admin panel with the phone's normal camera.
+2. The QR opens `/scan-web?session_id=...` on the same HTTPS backend origin.
+3. Enter the student `user_id`.
+4. Tap `Yoklamayi Gonder` and allow location access.
 5. The page sends the request to `POST /api/attendance/scan` with browser geolocation in `konum`.
-6. The page displays the backend result message and resumes scanning automatically.
+6. The page displays the backend result message.
 7. On iPhone Safari, optionally use `Share -> Add to Home Screen` to install it like an app.
+8. If the page opens without `session_id`, the student can choose a QR screenshot from the gallery as a fallback path.
 
 ## Web Scanner / PWA Notes
 
 - The web scanner is available at `/scan-web`.
-- HTTPS is required for browser camera and geolocation access.
+- HTTPS is required for browser geolocation access.
 - This web/PWA flow is the iOS-compatible scanner path and does not require a native iOS app.
 - The web scanner now relies on browser geolocation only; `wifi` has been removed from the system.
+- The web scanner no longer asks the user to scan the QR a second time inside the site.
+- The QR opens `/scan-web` directly with `session_id` already in the query string.
+- As a single-device fallback, `/scan-web` can also decode a QR screenshot from the gallery when `session_id` is missing from the URL.
 - iPhone Safari users must allow location access before a scan can be submitted.
 - Browser storage is used to persist:
   - the last entered `user_id`
