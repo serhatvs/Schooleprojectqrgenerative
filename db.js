@@ -272,6 +272,48 @@ async function getMonthlyAttendanceSummary() {
   return result.rows;
 }
 
+async function getDailyAttendanceExportRows(date) {
+  const result = await query(
+    `
+      SELECT
+        session_id,
+        user_id,
+        device_install_id,
+        TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
+        TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
+        wifi,
+        konum
+      FROM attendance_records
+      WHERE TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD') = $1
+      ORDER BY created_at ASC, id ASC;
+    `,
+    [date]
+  );
+
+  return result.rows;
+}
+
+async function getMonthlyAttendanceExportRows(month) {
+  const result = await query(
+    `
+      SELECT
+        session_id,
+        user_id,
+        device_install_id,
+        TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
+        TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
+        wifi,
+        konum
+      FROM attendance_records
+      WHERE TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $1
+      ORDER BY created_at ASC, id ASC;
+    `,
+    [month]
+  );
+
+  return result.rows;
+}
+
 async function restoreSessionFromDatabase() {
   const sessionResult = await query(
     `
@@ -322,8 +364,10 @@ module.exports = {
   expireStaleSessions,
   findDuplicateDevice,
   findDuplicateStudent,
+  getDailyAttendanceExportRows,
   getDailyAttendanceSummary,
   getDailyAttendanceView,
+  getMonthlyAttendanceExportRows,
   getMonthlyAttendanceSummary,
   getMonthlyAttendanceView,
   initDatabase,

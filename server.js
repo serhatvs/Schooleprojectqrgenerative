@@ -8,8 +8,10 @@ const {
   expireStaleSessions,
   findDuplicateDevice,
   findDuplicateStudent,
+  getDailyAttendanceExportRows,
   getDailyAttendanceSummary,
   getDailyAttendanceView,
+  getMonthlyAttendanceExportRows,
   getMonthlyAttendanceSummary,
   getMonthlyAttendanceView,
   initDatabase,
@@ -480,6 +482,39 @@ function serializeSession(session) {
   };
 }
 
+function escapeCsvValue(value) {
+  const stringValue = value == null ? "" : String(value);
+
+  return `"${stringValue.replace(/"/g, "\"\"")}"`;
+}
+
+function buildAttendanceCsv(rows) {
+  const header = [
+    "session_id",
+    "user_id",
+    "device_install_id",
+    "scan_time",
+    "created_at",
+    "wifi",
+    "konum",
+  ].join(",");
+  const lines = rows.map((row) =>
+    [
+      row.session_id,
+      row.user_id,
+      row.device_install_id,
+      row.scan_time,
+      row.created_at,
+      row.wifi,
+      row.konum,
+    ]
+      .map(escapeCsvValue)
+      .join(",")
+  );
+
+  return `\uFEFF${[header, ...lines].join("\r\n")}`;
+}
+
 function createApp() {
   const app = express();
   const store = createSessionStore();
@@ -577,6 +612,48 @@ function createApp() {
       res.json(await getMonthlyAttendanceSummary());
     } catch (error) {
       console.error("Failed to load monthly attendance summary:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
+  app.get("/api/attendance/daily-export", requireAdmin, async (req, res) => {
+    const { date } = req.query;
+
+    if (!isValidDateQuery(date)) {
+      return res.status(400).json({ error: "invalid_date" });
+    }
+
+    try {
+      const rows = await getDailyAttendanceExportRows(date);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="attendance_${date}.csv"`
+      );
+      res.send(buildAttendanceCsv(rows));
+    } catch (error) {
+      console.error("Failed to export daily attendance:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
+  app.get("/api/attendance/monthly-export", requireAdmin, async (req, res) => {
+    const { month } = req.query;
+
+    if (!isValidMonthQuery(month)) {
+      return res.status(400).json({ error: "invalid_month" });
+    }
+
+    try {
+      const rows = await getMonthlyAttendanceExportRows(month);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="attendance_${month}.csv"`
+      );
+      res.send(buildAttendanceCsv(rows));
+    } catch (error) {
+      console.error("Failed to export monthly attendance:", error);
       res.status(500).json({ error: "server_error" });
     }
   });

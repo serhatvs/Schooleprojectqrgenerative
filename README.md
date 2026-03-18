@@ -12,6 +12,8 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
   - `GET /api/attendance/monthly-view?month=YYYY-MM`
   - `GET /api/attendance/daily-summary`
   - `GET /api/attendance/monthly-summary`
+  - `GET /api/attendance/daily-export?date=YYYY-MM-DD`
+  - `GET /api/attendance/monthly-export?month=YYYY-MM`
 
 ## How It Works
 
@@ -26,6 +28,7 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
 - Attendance reporting/export endpoints read directly from `attendance_records`.
 - Daily and monthly filtering/grouping use Turkey-local `scan_time`.
 - View endpoints return `scan_time` and `created_at` in `Europe/Istanbul` formatted as `YYYY-MM-DD HH:mm`.
+- Export endpoints return BOM-prefixed CSV downloads with the same timestamp formatting.
 
 ## Local Run
 
@@ -91,6 +94,15 @@ Reporting / export:
 3. Use `/api/attendance/monthly-view?month=2026-03` for detailed rows from a single Turkey-local month.
 4. Use `/api/attendance/daily-summary` for grouped daily totals.
 5. Use `/api/attendance/monthly-summary` for grouped monthly totals.
+6. Use `/api/attendance/daily-export?date=2026-03-18` to download a CSV export for one day.
+7. Use `/api/attendance/monthly-export?month=2026-03` to download a CSV export for one month.
+
+Example curl usage:
+
+```bash
+curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/daily-export?date=2026-03-18"
+curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/monthly-export?month=2026-03"
+```
 
 ## Persistence
 
