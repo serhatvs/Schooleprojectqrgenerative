@@ -519,6 +519,13 @@ function createApp() {
   const app = express();
   const store = createSessionStore();
   const publicDir = path.join(__dirname, "public");
+  const scanWebDir = path.join(publicDir, "scan-web");
+  const scanWebBundlePath = path.join(
+    __dirname,
+    "node_modules",
+    "html5-qrcode",
+    "html5-qrcode.min.js"
+  );
 
   app.locals.store = store;
   app.use(express.json());
@@ -530,6 +537,24 @@ function createApp() {
   app.get("/favicon.ico", (req, res) => {
     res.status(204).end();
   });
+
+  app.get(["/scan-web", "/scan-web/"], (req, res) => {
+    res.sendFile(path.join(scanWebDir, "index.html"));
+  });
+
+  app.get("/sw.js", (req, res) => {
+    res.setHeader("Service-Worker-Allowed", "/scan-web");
+    res.type("application/javascript").sendFile(path.join(scanWebDir, "sw.js"));
+  });
+
+  app.get("/scan-web/vendor/html5-qrcode.min.js", (req, res) => {
+    res
+      .type("application/javascript")
+      .setHeader("Cache-Control", "public, max-age=31536000, immutable")
+      .sendFile(scanWebBundlePath);
+  });
+
+  app.use("/scan-web", express.static(scanWebDir, { index: false }));
 
   app.get("/", requireAdminSecret, (req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));

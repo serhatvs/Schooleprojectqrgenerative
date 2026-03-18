@@ -1,0 +1,23 @@
+{
+  "name": "Attendance Web Scanner",
+  "short_name": "Yoklama",
+  "start_url": "/scan-web",
+  "scope": "/scan-web",
+  "display": "standalone",
+  "background_color": "#f6fbfa",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/scan-web/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/scan-web/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

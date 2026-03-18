@@ -1,10 +1,11 @@
 # Attendance QR MVP
 
-Minimal Node.js + Express backend for the attendance QR generator, admin panel, and public mobile scan endpoint.
+Minimal Node.js + Express backend for the attendance QR generator, admin panel, and public scan endpoints for mobile and web clients.
 
 ## Endpoints
 
 - `/admin` is the admin panel.
+- `/scan-web` is the public iOS-compatible web scanner and PWA entry.
 - `POST /api/attendance/scan` is the public student scan endpoint.
 - Session management endpoints remain unchanged and stay admin-protected.
 - Attendance reporting endpoints remain admin-protected:
@@ -86,6 +87,27 @@ Student / mobile scanner:
 3. Scan the active QR code from the admin panel.
 4. The app sends the request to `POST /api/attendance/scan`.
 5. The app displays the backend result message.
+
+Student / web scanner / PWA:
+
+1. Open `/scan-web` on the same HTTPS backend origin.
+2. Enter the student `user_id`.
+3. Tap `Tarayiciyi Baslat` and allow camera access.
+4. Scan the active QR code from the admin panel.
+5. The page sends the request to `POST /api/attendance/scan` with `wifi: "web"` and `konum: "web"`.
+6. The page displays the backend result message and resumes scanning automatically.
+7. On iPhone Safari, optionally use `Share -> Add to Home Screen` to install it like an app.
+
+## Web Scanner / PWA Notes
+
+- The web scanner is available at `/scan-web`.
+- HTTPS is required for browser camera access.
+- This web/PWA flow is the iOS-compatible scanner path and does not require a native iOS app.
+- Browser storage is used to persist:
+  - the last entered `user_id`
+  - `device_install_id`
+  - `device_install_password`
+- Backend contracts remain unchanged; the web client only reuses the existing `POST /api/attendance/scan` endpoint.
 
 Reporting / export:
 

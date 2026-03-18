@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Yoklama Tarayici</title>
+    <meta name="theme-color" content="#0f766e" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Yoklama" />
+    <link rel="manifest" href="/scan-web/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/scan-web/icons/icon-192.png" />
+    <link rel="icon" href="/scan-web/icons/icon-192.png" />
+    <link rel="stylesheet" href="/scan-web/scan-web.css" />
+    <script src="/scan-web/vendor/html5-qrcode.min.js" defer></script>
+    <script src="/scan-web/scan-web.js" defer></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="scanner-card">
+        <p class="eyebrow">Attendance</p>
+        <h1>Web QR Scanner</h1>
+        <p class="subtle-copy">
+          Ogrenci numaranizi girin, kamerayi acin ve aktif QR kodunu taratin.
+        </p>
+
+        <label class="field" for="user-id-input">
+          <span>Ogrenci No</span>
+          <input
+            id="user-id-input"
+            type="text"
+            inputmode="text"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="Ogrenci numarasi"
+          />
+        </label>
+
+        <button id="start-button" class="primary-button" type="button">
+          Tarayiciyi Baslat
+        </button>
+
+        <section class="camera-panel" aria-labelledby="camera-title">
+          <div class="camera-panel-header">
+            <h2 id="camera-title">Kamera</h2>
+            <p>HTTPS ve kamera izni gereklidir.</p>
+          </div>
+          <div id="scanner-shell" class="scanner-shell">
+            <div id="scanner-reader" class="scanner-reader" hidden></div>
+            <p id="scanner-placeholder" class="scanner-placeholder">
+              Tarama baslatildiginda kamera goruntusu burada acilir.
+            </p>
+          </div>
+        </section>
+
+        <section
+          id="result-banner"
+          class="result-banner result-idle"
+          aria-live="polite"
+        >
+          Tarayici hazir.
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
