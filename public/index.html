@@ -18,54 +18,231 @@
           </p>
         </div>
 
-        <div class="qr-card" aria-live="polite">
-          <img
-            id="qr-image"
-            class="qr-image"
-            alt="Attendance session QR code"
-            hidden
-          />
-          <div id="qr-placeholder" class="qr-placeholder">
-            <p id="placeholder-title" class="placeholder-title">
-              No active session
-            </p>
-            <p id="placeholder-copy" class="placeholder-copy">
-              Start a session to generate a QR code.
-            </p>
-          </div>
-        </div>
+        <div class="panel-layout">
+          <section class="session-section" aria-labelledby="session-title">
+            <div class="section-header">
+              <h2 id="session-title" class="section-title">Session Control</h2>
+              <p class="section-copy">
+                Generate the active QR code and keep the session visible for students.
+              </p>
+            </div>
 
-        <div class="actions">
-          <button id="start-button" class="button button-primary" type="button">
-            Start Session
-          </button>
-          <button id="end-button" class="button button-secondary" type="button">
-            End Session
-          </button>
-        </div>
+            <div class="qr-card" aria-live="polite">
+              <img
+                id="qr-image"
+                class="qr-image"
+                alt="Attendance session QR code"
+                hidden
+              />
+              <div id="qr-placeholder" class="qr-placeholder">
+                <p id="placeholder-title" class="placeholder-title">
+                  No active session
+                </p>
+                <p id="placeholder-copy" class="placeholder-copy">
+                  Start a session to generate a QR code.
+                </p>
+              </div>
+            </div>
 
-        <dl class="session-details">
-          <div class="detail-row">
-            <dt>Session ID</dt>
-            <dd id="session-id">-</dd>
-          </div>
-          <div class="detail-row">
-            <dt>Start Time</dt>
-            <dd id="start-time">-</dd>
-          </div>
-          <div class="detail-row">
-            <dt>Expiration Time</dt>
-            <dd id="expiration-time">-</dd>
-          </div>
-          <div class="detail-row">
-            <dt>Status</dt>
-            <dd>
-              <span id="status-badge" class="status-badge status-idle">
-                Not started
-              </span>
-            </dd>
-          </div>
-        </dl>
+            <div class="actions">
+              <button id="start-button" class="button button-primary" type="button">
+                Start Session
+              </button>
+              <button id="end-button" class="button button-secondary" type="button">
+                End Session
+              </button>
+            </div>
+
+            <dl class="session-details">
+              <div class="detail-row">
+                <dt>Session ID</dt>
+                <dd id="session-id">-</dd>
+              </div>
+              <div class="detail-row">
+                <dt>Start Time</dt>
+                <dd id="start-time">-</dd>
+              </div>
+              <div class="detail-row">
+                <dt>Expiration Time</dt>
+                <dd id="expiration-time">-</dd>
+              </div>
+              <div class="detail-row">
+                <dt>Status</dt>
+                <dd>
+                  <span id="status-badge" class="status-badge status-idle">
+                    Not started
+                  </span>
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="dashboard-section" aria-labelledby="dashboard-title">
+            <div class="dashboard-header">
+              <div>
+                <p class="eyebrow dashboard-eyebrow">Dashboard</p>
+                <h2 id="dashboard-title" class="section-title">
+                  Attendance Dashboard
+                </h2>
+                <p class="section-copy">
+                  Review daily and monthly attendance, flagged scans, and exports.
+                </p>
+              </div>
+              <p id="dashboard-status" class="dashboard-status" aria-live="polite">
+                Loading dashboard...
+              </p>
+            </div>
+
+            <section class="overview-grid" aria-label="Overview">
+              <article class="overview-card">
+                <p class="overview-label">Today Attendance</p>
+                <p id="today-attendance-value" class="overview-value">0</p>
+              </article>
+              <article class="overview-card">
+                <p class="overview-label">Today Sessions</p>
+                <p id="today-session-value" class="overview-value">0</p>
+              </article>
+              <article class="overview-card">
+                <p class="overview-label">Total Attendance</p>
+                <p id="total-attendance-value" class="overview-value">0</p>
+              </article>
+              <article class="overview-card overview-card-warning">
+                <p class="overview-label">Flagged Scans</p>
+                <p id="flagged-attendance-value" class="overview-value">0</p>
+              </article>
+            </section>
+
+            <section class="controls-grid" aria-label="Filters and exports">
+              <article class="control-card">
+                <h3 class="control-title">Daily Detail</h3>
+                <label class="field-label" for="daily-date-input">Date</label>
+                <input id="daily-date-input" class="input-field" type="date" />
+                <div class="button-row">
+                  <button id="daily-view-button" class="button button-secondary" type="button">
+                    View Day
+                  </button>
+                  <button id="daily-export-button" class="button button-secondary" type="button">
+                    Export Day
+                  </button>
+                </div>
+              </article>
+
+              <article class="control-card">
+                <h3 class="control-title">Monthly Detail</h3>
+                <label class="field-label" for="monthly-month-input">Month</label>
+                <input id="monthly-month-input" class="input-field" type="month" />
+                <div class="button-row">
+                  <button id="monthly-view-button" class="button button-secondary" type="button">
+                    View Month
+                  </button>
+                  <button id="monthly-export-button" class="button button-secondary" type="button">
+                    Export Month
+                  </button>
+                </div>
+              </article>
+
+              <article class="control-card">
+                <h3 class="control-title">All Attendance</h3>
+                <p class="control-copy">
+                  Download the full attendance archive as a CSV file.
+                </p>
+                <button id="total-export-button" class="button button-primary" type="button">
+                  Export All Attendance
+                </button>
+              </article>
+            </section>
+
+            <section class="table-card" aria-labelledby="daily-summary-title">
+              <div class="table-card-header">
+                <h3 id="daily-summary-title">Daily Summary</h3>
+                <p>Use View to open daily details or Export to download a CSV.</p>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Session Count</th>
+                      <th>Attendance Count</th>
+                      <th>Flagged Count</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="daily-summary-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="table-card" aria-labelledby="daily-detail-title">
+              <div class="table-card-header">
+                <h3 id="daily-detail-title">Daily Detail</h3>
+                <p id="daily-detail-copy">Rows for the selected day appear here.</p>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>User ID</th>
+                      <th>Session ID</th>
+                      <th>Scan Time</th>
+                      <th>Created At</th>
+                      <th>Konum</th>
+                      <th>In School</th>
+                      <th>Distance</th>
+                      <th>Flag Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody id="daily-detail-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="table-card" aria-labelledby="monthly-summary-title">
+              <div class="table-card-header">
+                <h3 id="monthly-summary-title">Monthly Summary</h3>
+                <p>Review totals by month and open the detailed monthly rows.</p>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th>Session Count</th>
+                      <th>Attendance Count</th>
+                      <th>Flagged Count</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="monthly-summary-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="table-card" aria-labelledby="monthly-detail-title">
+              <div class="table-card-header">
+                <h3 id="monthly-detail-title">Monthly Detail</h3>
+                <p id="monthly-detail-copy">Rows for the selected month appear here.</p>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>User ID</th>
+                      <th>Session ID</th>
+                      <th>Scan Time</th>
+                      <th>Created At</th>
+                      <th>Konum</th>
+                      <th>In School</th>
+                      <th>Distance</th>
+                      <th>Flag Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody id="monthly-detail-body"></tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+        </div>
       </section>
     </main>
 

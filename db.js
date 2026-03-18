@@ -275,7 +275,8 @@ async function getDailyAttendanceSummary() {
     SELECT
       TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD') AS date,
       COUNT(DISTINCT session_id)::int AS session_count,
-      COUNT(*)::int AS attendance_count
+      COUNT(*)::int AS attendance_count,
+      COUNT(*) FILTER (WHERE is_in_school = FALSE OR flag_reason IS NOT NULL)::int AS flagged_count
     FROM attendance_records
     GROUP BY TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD')
     ORDER BY date DESC;
@@ -289,7 +290,8 @@ async function getMonthlyAttendanceSummary() {
     SELECT
       TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') AS month,
       COUNT(DISTINCT session_id)::int AS session_count,
-      COUNT(*)::int AS attendance_count
+      COUNT(*)::int AS attendance_count,
+      COUNT(*) FILTER (WHERE is_in_school = FALSE OR flag_reason IS NOT NULL)::int AS flagged_count
     FROM attendance_records
     GROUP BY TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')
     ORDER BY month DESC;
@@ -340,6 +342,25 @@ async function getMonthlyAttendanceExportRows(month) {
     `,
     [month]
   );
+
+  return result.rows;
+}
+
+async function getTotalAttendanceExportRows() {
+  const result = await query(`
+    SELECT
+      session_id,
+      user_id,
+      device_install_id,
+      TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
+      TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
+      konum,
+      is_in_school,
+      distance_meters,
+      flag_reason
+    FROM attendance_records
+    ORDER BY created_at ASC, id ASC;
+  `);
 
   return result.rows;
 }
@@ -402,6 +423,7 @@ module.exports = {
   getMonthlyAttendanceExportRows,
   getMonthlyAttendanceSummary,
   getMonthlyAttendanceView,
+  getTotalAttendanceExportRows,
   initDatabase,
   insertAttendanceRecord,
   markSessionEnded,

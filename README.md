@@ -15,11 +15,12 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
   - `GET /api/attendance/monthly-summary`
   - `GET /api/attendance/daily-export?date=YYYY-MM-DD`
   - `GET /api/attendance/monthly-export?month=YYYY-MM`
+  - `GET /api/attendance/total-export`
 
 ## How It Works
 
 - The server keeps only one session in memory.
-- `Start Session` creates a random `session_id`, current `start_time`, `expires_at` 10 minutes later, and marks the session as active.
+- `Start Session` creates a random `session_id`, current `start_time`, `expires_at` 3 hours later, and marks the session as active.
 - The QR payload is encoded as JSON with `session_id`, `timestamp`, and `nonce`.
 - The server turns that payload into a QR image and sends it to the page as a data URL.
 - Session metadata is synchronized into PostgreSQL and the latest valid active session is restored on startup.
@@ -40,6 +41,7 @@ In PowerShell:
 ```powershell
 $env:ADMIN_SECRET="supersecret123"
 $env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/attendance"
+$env:SESSION_DURATION_MINUTES="180"
 npm.cmd install
 npm.cmd start
 ```
@@ -78,9 +80,10 @@ Admin:
 
 1. Open `/admin`.
 2. Enter the current `ADMIN_SECRET`.
-3. Start a session.
-4. Show the generated QR code to students.
-5. End the session when attendance is finished.
+3. Start a session and show the generated QR code to students.
+4. Review the dashboard cards, daily/monthly summaries, and detailed attendance rows.
+5. Use the export buttons for selected day, selected month, or total attendance.
+6. End the session when attendance is finished.
 
 Student / mobile scanner:
 
@@ -122,12 +125,14 @@ Reporting / export:
 5. Use `/api/attendance/monthly-summary` for grouped monthly totals.
 6. Use `/api/attendance/daily-export?date=2026-03-18` to download a CSV export for one day.
 7. Use `/api/attendance/monthly-export?month=2026-03` to download a CSV export for one month.
+8. Use `/api/attendance/total-export` to download all attendance rows.
 
 Example curl usage:
 
 ```bash
 curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/daily-export?date=2026-03-18"
 curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/monthly-export?month=2026-03"
+curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/total-export"
 ```
 
 ## Persistence

@@ -14,6 +14,7 @@ const {
   getMonthlyAttendanceExportRows,
   getMonthlyAttendanceSummary,
   getMonthlyAttendanceView,
+  getTotalAttendanceExportRows,
   initDatabase,
   insertAttendanceRecord,
   markSessionEnded,
@@ -23,7 +24,13 @@ const {
 } = require("./db");
 
 const PORT = Number(process.env.PORT) || 3000;
-const SESSION_DURATION_MS = 10 * 60 * 1000;
+const DEFAULT_SESSION_DURATION_MINUTES = 180;
+const parsedSessionDurationMinutes = Number(process.env.SESSION_DURATION_MINUTES);
+const SESSION_DURATION_MINUTES =
+  Number.isFinite(parsedSessionDurationMinutes) && parsedSessionDurationMinutes > 0
+    ? parsedSessionDurationMinutes
+    : DEFAULT_SESSION_DURATION_MINUTES;
+const SESSION_DURATION_MS = SESSION_DURATION_MINUTES * 60 * 1000;
 const DATE_QUERY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_QUERY_REGEX = /^\d{4}-\d{2}$/;
 const SCHOOL_LATITUDE = 38.73884317007882;
@@ -760,6 +767,21 @@ function createApp() {
       res.send(buildAttendanceCsv(rows));
     } catch (error) {
       console.error("Failed to export monthly attendance:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
+  app.get("/api/attendance/total-export", requireAdmin, async (req, res) => {
+    try {
+      const rows = await getTotalAttendanceExportRows();
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="attendance_total.csv"'
+      );
+      res.send(buildAttendanceCsv(rows));
+    } catch (error) {
+      console.error("Failed to export total attendance:", error);
       res.status(500).json({ error: "server_error" });
     }
   });
