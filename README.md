@@ -94,15 +94,17 @@ Student / web scanner / PWA:
 2. Enter the student `user_id`.
 3. Tap `Tarayiciyi Baslat` and allow camera access.
 4. Scan the active QR code from the admin panel.
-5. The page sends the request to `POST /api/attendance/scan` with `wifi: "web"` and `konum: "web"`.
+5. The page sends the request to `POST /api/attendance/scan` with browser geolocation in `konum`.
 6. The page displays the backend result message and resumes scanning automatically.
 7. On iPhone Safari, optionally use `Share -> Add to Home Screen` to install it like an app.
 
 ## Web Scanner / PWA Notes
 
 - The web scanner is available at `/scan-web`.
-- HTTPS is required for browser camera access.
+- HTTPS is required for browser camera and geolocation access.
 - This web/PWA flow is the iOS-compatible scanner path and does not require a native iOS app.
+- The web scanner now relies on browser geolocation only; `wifi` has been removed from the system.
+- iPhone Safari users must allow location access before a scan can be submitted.
 - Browser storage is used to persist:
   - the last entered `user_id`
   - `device_install_id`
@@ -130,5 +132,6 @@ curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendan
 
 - Attendance records are now stored in PostgreSQL, not NDJSON files.
 - The backend creates the minimal `sessions` and `attendance_records` tables automatically on startup.
+- Database initialization safely runs `ALTER TABLE attendance_records DROP COLUMN IF EXISTS wifi;`.
 - Session start/end updates the `sessions` table to keep PostgreSQL synchronized with the current in-memory session.
 - On startup, the backend restores the newest still-valid active session from PostgreSQL and rebuilds in-memory duplicate tracking from `attendance_records`.

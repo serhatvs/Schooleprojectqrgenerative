@@ -84,7 +84,6 @@ async function buildRestoredSession(restoredSession) {
       device_install_id: record.device_install_id,
       device_install_password: record.device_install_password,
       scan_time: toIsoString(record.scan_time),
-      wifi: record.wifi,
       konum: record.konum,
       session_id: record.session_id,
     };
@@ -113,7 +112,6 @@ function hasValidScanPayload(payload) {
     isNonEmptyString(payload?.device_install_id) &&
     isNonEmptyString(payload?.device_install_password) &&
     isNonEmptyString(payload?.scan_time) &&
-    isNonEmptyString(payload?.wifi) &&
     isNonEmptyString(payload?.konum) &&
     isNonEmptyString(payload?.session_id)
   );
@@ -429,7 +427,6 @@ function createSessionStore() {
         device_install_id: payload.device_install_id,
         device_install_password: payload.device_install_password,
         scan_time: payload.scan_time,
-        wifi: payload.wifi,
         konum: payload.konum,
         session_id: payload.session_id,
       };
@@ -495,7 +492,6 @@ function buildAttendanceCsv(rows) {
     "device_install_id",
     "scan_time",
     "created_at",
-    "wifi",
     "konum",
   ].join(",");
   const lines = rows.map((row) =>
@@ -505,7 +501,6 @@ function buildAttendanceCsv(rows) {
       row.device_install_id,
       row.scan_time,
       row.created_at,
-      row.wifi,
       row.konum,
     ]
       .map(escapeCsvValue)

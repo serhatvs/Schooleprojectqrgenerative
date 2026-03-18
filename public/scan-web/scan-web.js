@@ -12,10 +12,12 @@ const RESULT_MESSAGES = {
   invalid_qr: { text: "Gecersiz QR", tone: "danger" },
   unreadable_qr: { text: "QR okunamadi", tone: "danger" },
   missing_user_id: { text: "Ogrenci numarasi giriniz", tone: "warning" },
+  location_required: { text: "Konum izni gerekli", tone: "warning" },
   camera_error: { text: "Kamera acilamadi", tone: "danger" },
   server_error: { text: "Sunucuya ulasilamadi", tone: "danger" },
   ready: { text: "Tarayici hazir.", tone: "idle" },
   starting: { text: "Kamera baslatiliyor...", tone: "idle" },
+  getting_location: { text: "Konum aliniyor...", tone: "idle" },
 };
 
 const RESUME_DELAY_MS = 3000;
@@ -144,6 +146,36 @@ function getCurrentUserId() {
 
 function getStatusMessage(status) {
   return RESULT_MESSAGES[status] ?? RESULT_MESSAGES.server_error;
+}
+
+function getCurrentPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation unavailable"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    });
+  });
+}
+
+async function getKonum() {
+  try {
+    const position = await getCurrentPosition();
+    const { latitude, longitude } = position.coords ?? {};
+
+    if (typeof latitude !== "number" || typeof longitude !== "number") {
+      throw new Error("Missing coordinates");
+    }
+
+    return `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+  } catch (error) {
+    throw new Error("Konum izni gerekli");
+  }
 }
 
 function extractSessionIdFromQr(decodedText) {
@@ -291,6 +323,7 @@ function resumeScanningSoon() {
 
 async function submitAttendance(sessionId) {
   const { deviceInstallId, deviceInstallPassword } = ensureDeviceCredentials();
+  const konum = await getKonum();
 
   const response = await fetch(`${window.location.origin}/api/attendance/scan`, {
     method: "POST",
@@ -302,8 +335,7 @@ async function submitAttendance(sessionId) {
       device_install_id: deviceInstallId,
       device_install_password: deviceInstallPassword,
       scan_time: new Date().toISOString(),
-      wifi: "web",
-      konum: "web",
+      konum,
       session_id: sessionId,
     }),
   });
@@ -342,11 +374,25 @@ async function processDecodedText(decodedText) {
   }
 
   try {
+    setResult(
+      RESULT_MESSAGES.getting_location.text,
+      RESULT_MESSAGES.getting_location.tone
+    );
     const outcome = await submitAttendance(qrResult.sessionId);
     setResult(outcome.text, outcome.tone);
   } catch (error) {
-    console.error("Failed to submit attendance:", error);
-    setResult(RESULT_MESSAGES.server_error.text, RESULT_MESSAGES.server_error.tone);
+    if (error instanceof Error && error.message === "Konum izni gerekli") {
+      setResult(
+        RESULT_MESSAGES.location_required.text,
+        RESULT_MESSAGES.location_required.tone
+      );
+    } else {
+      console.error("Failed to submit attendance:", error);
+      setResult(
+        RESULT_MESSAGES.server_error.text,
+        RESULT_MESSAGES.server_error.tone
+      );
+    }
   }
 
   resumeScanningSoon();

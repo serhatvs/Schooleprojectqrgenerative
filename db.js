@@ -41,12 +41,15 @@ async function initDatabase() {
       device_install_id TEXT NOT NULL,
       device_install_password TEXT NOT NULL,
       scan_time TIMESTAMPTZ NOT NULL,
-      wifi TEXT NOT NULL,
       konum TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (session_id, user_id),
       UNIQUE (session_id, device_install_id)
     );
+  `);
+  await query(`
+    ALTER TABLE attendance_records
+    DROP COLUMN IF EXISTS wifi;
   `);
 }
 
@@ -157,10 +160,9 @@ async function insertAttendanceRecord(record) {
         device_install_id,
         device_install_password,
         scan_time,
-        wifi,
         konum
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7);
+      VALUES ($1, $2, $3, $4, $5, $6);
     `,
     [
       record.session_id,
@@ -168,7 +170,6 @@ async function insertAttendanceRecord(record) {
       record.device_install_id,
       record.device_install_password,
       record.scan_time,
-      record.wifi,
       record.konum,
     ]
   );
@@ -211,7 +212,6 @@ async function getDailyAttendanceView(date) {
         device_install_id,
         TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
         TO_CHAR(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
-        wifi,
         konum
       FROM attendance_records
       WHERE TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD') = $1
@@ -232,7 +232,6 @@ async function getMonthlyAttendanceView(month) {
         device_install_id,
         TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
         TO_CHAR(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
-        wifi,
         konum
       FROM attendance_records
       WHERE TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $1
@@ -281,7 +280,6 @@ async function getDailyAttendanceExportRows(date) {
         device_install_id,
         TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
         TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
-        wifi,
         konum
       FROM attendance_records
       WHERE TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD') = $1
@@ -302,7 +300,6 @@ async function getMonthlyAttendanceExportRows(month) {
         device_install_id,
         TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
         TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
-        wifi,
         konum
       FROM attendance_records
       WHERE TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $1
@@ -345,7 +342,6 @@ async function restoreSessionFromDatabase() {
         device_install_id,
         device_install_password,
         scan_time,
-        wifi,
         konum
       FROM attendance_records
       WHERE session_id = $1
