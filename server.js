@@ -148,6 +148,20 @@ function requireAdminSecret(req, res, next) {
   next();
 }
 
+function requireAdmin(req, res, next) {
+  if (!process.env.ADMIN_SECRET) {
+    return res.status(500).json({ error: "server_error" });
+  }
+
+  const secret = req.headers["x-admin-secret"];
+
+  if (!secret || secret !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+
+  next();
+}
+
 function renderAdminBootstrapPage() {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -519,7 +533,7 @@ function createApp() {
     }
   });
 
-  app.get("/api/attendance/daily-view", requireAdminSecret, async (req, res) => {
+  app.get("/api/attendance/daily-view", requireAdmin, async (req, res) => {
     const { date } = req.query;
 
     if (!isValidDateQuery(date)) {
@@ -534,7 +548,7 @@ function createApp() {
     }
   });
 
-  app.get("/api/attendance/monthly-view", requireAdminSecret, async (req, res) => {
+  app.get("/api/attendance/monthly-view", requireAdmin, async (req, res) => {
     const { month } = req.query;
 
     if (!isValidMonthQuery(month)) {
@@ -549,7 +563,7 @@ function createApp() {
     }
   });
 
-  app.get("/api/attendance/daily-summary", requireAdminSecret, async (req, res) => {
+  app.get("/api/attendance/daily-summary", requireAdmin, async (req, res) => {
     try {
       res.json(await getDailyAttendanceSummary());
     } catch (error) {
@@ -558,7 +572,7 @@ function createApp() {
     }
   });
 
-  app.get("/api/attendance/monthly-summary", requireAdminSecret, async (req, res) => {
+  app.get("/api/attendance/monthly-summary", requireAdmin, async (req, res) => {
     try {
       res.json(await getMonthlyAttendanceSummary());
     } catch (error) {
