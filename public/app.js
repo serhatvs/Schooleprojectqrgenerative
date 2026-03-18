@@ -43,7 +43,21 @@ const dashboardState = {
   selectedMonth: getTurkeyMonthString(),
 };
 
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
+const SESSION_STATUS_LABELS = {
+  active: "Açık",
+  expired: "Süresi Doldu",
+  ended: "Kapatıldı",
+};
+
+const ERROR_MESSAGE_MAP = {
+  invalid_date: "Geçerli bir tarih seçin.",
+  invalid_month: "Geçerli bir ay seçin.",
+  unauthorized: "Yönetici şifresi eksik veya hatalı.",
+  forbidden: "Yönetici şifresi eksik veya hatalı.",
+  server_error: "İşlem şu anda tamamlanamadı.",
+};
+
+const dateFormatter = new Intl.DateTimeFormat("tr-TR", {
   dateStyle: "medium",
   timeStyle: "medium",
 });
@@ -75,6 +89,26 @@ function getTurkeyDateString(date = new Date()) {
 
 function getTurkeyMonthString(date = new Date()) {
   return getTurkeyDateString(date).slice(0, 7);
+}
+
+function getUserMessage(message, fallbackMessage) {
+  if (typeof message !== "string" || !message.trim()) {
+    return fallbackMessage;
+  }
+
+  return ERROR_MESSAGE_MAP[message] ?? fallbackMessage;
+}
+
+function formatFlagReason(value) {
+  if (!value) {
+    return "-";
+  }
+
+  if (value === "out_of_school") {
+    return "Kampüs Dışı";
+  }
+
+  return "Şüpheli";
 }
 
 function normalizeClientSession(session) {
@@ -114,14 +148,14 @@ function ensureAdminSecret() {
   }
 
   const enteredSecret = window.prompt(
-    "Enter the admin secret to use the Attendance QR Panel."
+    "Yoklama ekranını açmak için yönetici şifresini girin."
   );
 
   if (!enteredSecret || !enteredSecret.trim()) {
     adminSecret = "";
     setPanelMessage(
-      "Admin secret required",
-      "Refresh the page and enter the admin secret to use the panel."
+      "Yönetici şifresi gerekli",
+      "Sayfayı yenileyip yönetici şifresini girin."
     );
     renderSession();
     renderDashboard();
@@ -140,8 +174,8 @@ function handleUnauthorized() {
   currentSession = null;
   resetDashboardState();
   setPanelMessage(
-    "Unauthorized",
-    "The admin secret is missing or incorrect. Refresh the page and enter the correct secret."
+    "Yetkisiz erişim",
+    "Yönetici şifresi eksik veya hatalı. Sayfayı yenileyip doğru şifreyi girin."
   );
   renderSession();
   renderDashboard();
@@ -185,7 +219,7 @@ function escapeHtml(value) {
 }
 
 function setStatus(status) {
-  const label = status ? status[0].toUpperCase() + status.slice(1) : "Not started";
+  const label = status ? (SESSION_STATUS_LABELS[status] ?? status) : "Henüz Başlatılmadı";
   statusBadge.textContent = label;
   statusBadge.className = `status-badge ${
     status ? `status-${status}` : "status-idle"
@@ -233,16 +267,16 @@ function renderSession() {
     qrPlaceholder.hidden = false;
 
     if (!hasSession) {
-      placeholderTitle.textContent = "No active session";
-      placeholderCopy.textContent = "Start a session to generate a QR code.";
+      placeholderTitle.textContent = "Henüz aktif yoklama yok";
+      placeholderCopy.textContent = "QR kod oluşturmak için yoklama başlatın.";
     } else if (currentSession.status === "expired") {
-      placeholderTitle.textContent = "Session expired";
+      placeholderTitle.textContent = "Yoklamanın süresi doldu";
       placeholderCopy.textContent =
-        "This QR code is no longer valid. Start a new session to generate another code.";
+        "Bu QR kod artık geçerli değil. Yeni bir yoklama başlatıp yeni kod oluşturun.";
     } else {
-      placeholderTitle.textContent = "Session inactive";
+      placeholderTitle.textContent = "Yoklama kapalı";
       placeholderCopy.textContent =
-        "The current session is not active. Start a new session when you are ready.";
+        "Hazır olduğunuzda yeni bir yoklama başlatın.";
     }
   }
 
@@ -286,7 +320,7 @@ function renderDailySummaryTable() {
   if (dashboardState.dailySummary.length === 0) {
     dailySummaryBody.innerHTML = buildEmptyTableRow(
       5,
-      "No attendance summary data found."
+      "Günlük özet kaydı bulunamadı."
     );
     return;
   }
@@ -307,7 +341,7 @@ function renderDailySummaryTable() {
                 data-action="view-day"
                 data-date="${escapeHtml(row.date)}"
               >
-                View
+                Görüntüle
               </button>
               <button
                 class="button button-secondary button-small"
@@ -315,7 +349,7 @@ function renderDailySummaryTable() {
                 data-action="export-day"
                 data-date="${escapeHtml(row.date)}"
               >
-                Export XLSX
+                Excel'e Aktar
               </button>
             </div>
           </td>
@@ -329,7 +363,7 @@ function renderMonthlySummaryTable() {
   if (dashboardState.monthlySummary.length === 0) {
     monthlySummaryBody.innerHTML = buildEmptyTableRow(
       5,
-      "No monthly summary data found."
+      "Aylık özet kaydı bulunamadı."
     );
     return;
   }
@@ -350,7 +384,7 @@ function renderMonthlySummaryTable() {
                 data-action="view-month"
                 data-month="${escapeHtml(row.month)}"
               >
-                View
+                Görüntüle
               </button>
               <button
                 class="button button-secondary button-small"
@@ -358,7 +392,7 @@ function renderMonthlySummaryTable() {
                 data-action="export-month"
                 data-month="${escapeHtml(row.month)}"
               >
-                Export XLSX
+                Excel'e Aktar
               </button>
             </div>
           </td>
@@ -370,13 +404,13 @@ function renderMonthlySummaryTable() {
 
 function buildDetailRows(rows) {
   if (rows.length === 0) {
-    return buildEmptyTableRow(8, "No attendance records found for this selection.");
+    return buildEmptyTableRow(8, "Bu seçim için yoklama kaydı bulunamadı.");
   }
 
   return rows
     .map((row) => {
       const isFlagged = row.is_in_school === false || Boolean(row.flag_reason);
-      const inSchoolLabel = row.is_in_school === false ? "No" : "Yes";
+      const inSchoolLabel = row.is_in_school === false ? "Hayır" : "Evet";
       const badgeClass = row.is_in_school === false ? "pill-flagged" : "pill-ok";
 
       return `
@@ -388,7 +422,7 @@ function buildDetailRows(rows) {
           <td>${escapeHtml(row.konum)}</td>
           <td><span class="pill ${badgeClass}">${inSchoolLabel}</span></td>
           <td>${escapeHtml(formatDistance(row.distance_meters))}</td>
-          <td>${escapeHtml(row.flag_reason ?? "-")}</td>
+          <td>${escapeHtml(formatFlagReason(row.flag_reason))}</td>
         </tr>
       `;
     })
@@ -396,10 +430,10 @@ function buildDetailRows(rows) {
 }
 
 function renderDetailTables() {
-  dailyDetailTitle.textContent = `Daily Detail - ${dashboardState.selectedDate}`;
-  monthlyDetailTitle.textContent = `Monthly Detail - ${dashboardState.selectedMonth}`;
-  dailyDetailCopy.textContent = `Attendance rows for ${dashboardState.selectedDate}.`;
-  monthlyDetailCopy.textContent = `Attendance rows for ${dashboardState.selectedMonth}.`;
+  dailyDetailTitle.textContent = `Günlük Kayıtlar - ${dashboardState.selectedDate}`;
+  monthlyDetailTitle.textContent = `Aylık Kayıtlar - ${dashboardState.selectedMonth}`;
+  dailyDetailCopy.textContent = `${dashboardState.selectedDate} günü için yoklama kayıtları.`;
+  monthlyDetailCopy.textContent = `${dashboardState.selectedMonth} ayı için yoklama kayıtları.`;
   dailyDetailBody.innerHTML = buildDetailRows(dashboardState.dailyDetails);
   monthlyDetailBody.innerHTML = buildDetailRows(dashboardState.monthlyDetails);
 }
@@ -423,10 +457,16 @@ async function requestJson(url, options = {}) {
     headers["x-admin-secret"] = adminSecret;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response;
+
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    throw new Error("Sunucuya ulaşılamadı.");
+  }
 
   let data = null;
 
@@ -442,11 +482,11 @@ async function requestJson(url, options = {}) {
 function getErrorMessage(response, data, fallbackMessage) {
   if (response.status === 403) {
     handleUnauthorized();
-    return "The admin secret is missing or incorrect.";
+    return "Yönetici şifresi eksik veya hatalı.";
   }
 
   if (typeof data?.error === "string") {
-    return data.error;
+    return getUserMessage(data.error, fallbackMessage);
   }
 
   return fallbackMessage;
@@ -457,7 +497,7 @@ function expectArrayResult(result, fallbackMessage) {
 
   if (response.status === 403) {
     handleUnauthorized();
-    throw new Error("The admin secret is missing or incorrect.");
+    throw new Error("Yönetici şifresi eksik veya hatalı.");
   }
 
   if (!response.ok) {
@@ -476,7 +516,7 @@ async function loadSession() {
   }
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response, data, "Failed to load session."));
+    throw new Error(getErrorMessage(response, data, "Yoklama bilgileri alınamadı."));
   }
 
   clearPanelMessage();
@@ -501,7 +541,7 @@ async function startSession(replaceActive = false) {
     renderSession();
 
     const confirmed = window.confirm(
-      "A session is already active. Replace it with a new session?"
+      "Açık bir yoklama var. Yeni yoklama ile değiştirmek ister misiniz?"
     );
 
     if (confirmed) {
@@ -512,7 +552,7 @@ async function startSession(replaceActive = false) {
   }
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response, data, "Failed to start session."));
+    throw new Error(getErrorMessage(response, data, "Yoklama başlatılamadı."));
   }
 
   clearPanelMessage();
@@ -531,7 +571,7 @@ async function endSession() {
   }
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response, data, "Failed to end session."));
+    throw new Error(getErrorMessage(response, data, "Yoklama bitirilemedi."));
   }
 
   clearPanelMessage();
@@ -543,22 +583,22 @@ async function loadDailyDetails() {
   const date = dailyDateInput.value || dashboardState.selectedDate;
 
   if (!date) {
-    setDashboardStatus("Select a date first.", "warning");
+    setDashboardStatus("Önce bir gün seçin.", "warning");
     return;
   }
 
   dashboardState.selectedDate = date;
   dailyDateInput.value = date;
-  setDashboardStatus(`Loading daily details for ${date}...`, "idle");
+  setDashboardStatus(`${date} günü için kayıtlar yükleniyor...`, "idle");
 
   try {
     const result = await requestJson(`/api/attendance/daily-view?date=${date}`);
     dashboardState.dailyDetails = expectArrayResult(
       result,
-      "Failed to load daily attendance details."
+      "Günlük kayıtlar alınamadı."
     );
     renderDashboard();
-    setDashboardStatus(`Daily details loaded for ${date}.`, "success");
+    setDashboardStatus(`${date} günü için kayıtlar hazır.`, "success");
   } catch (error) {
     dashboardState.dailyDetails = [];
     renderDashboard();
@@ -570,22 +610,22 @@ async function loadMonthlyDetails() {
   const month = monthlyMonthInput.value || dashboardState.selectedMonth;
 
   if (!month) {
-    setDashboardStatus("Select a month first.", "warning");
+    setDashboardStatus("Önce bir ay seçin.", "warning");
     return;
   }
 
   dashboardState.selectedMonth = month;
   monthlyMonthInput.value = month;
-  setDashboardStatus(`Loading monthly details for ${month}...`, "idle");
+  setDashboardStatus(`${month} ayı için kayıtlar yükleniyor...`, "idle");
 
   try {
     const result = await requestJson(`/api/attendance/monthly-view?month=${month}`);
     dashboardState.monthlyDetails = expectArrayResult(
       result,
-      "Failed to load monthly attendance details."
+      "Aylık kayıtlar alınamadı."
     );
     renderDashboard();
-    setDashboardStatus(`Monthly details loaded for ${month}.`, "success");
+    setDashboardStatus(`${month} ayı için kayıtlar hazır.`, "success");
   } catch (error) {
     dashboardState.monthlyDetails = [];
     renderDashboard();
@@ -594,7 +634,7 @@ async function loadMonthlyDetails() {
 }
 
 async function loadDashboardSummary() {
-  setDashboardStatus("Loading dashboard...", "idle");
+  setDashboardStatus("Yoklama kayıtları yükleniyor...", "idle");
 
   try {
     const [dailySummaryResult, monthlySummaryResult] = await Promise.all([
@@ -604,14 +644,14 @@ async function loadDashboardSummary() {
 
     dashboardState.dailySummary = expectArrayResult(
       dailySummaryResult,
-      "Failed to load daily attendance summary."
+      "Günlük özet alınamadı."
     );
     dashboardState.monthlySummary = expectArrayResult(
       monthlySummaryResult,
-      "Failed to load monthly attendance summary."
+      "Aylık özet alınamadı."
     );
     renderDashboard();
-    setDashboardStatus("Dashboard updated.", "success");
+    setDashboardStatus("Yoklama kayıtları güncellendi.", "success");
   } catch (error) {
     dashboardState.dailySummary = [];
     dashboardState.monthlySummary = [];
@@ -639,23 +679,29 @@ async function downloadProtectedFile(url, fallbackName) {
     headers["x-admin-secret"] = adminSecret;
   }
 
-  const response = await fetch(url, { headers });
+  let response;
+
+  try {
+    response = await fetch(url, { headers });
+  } catch (error) {
+    throw new Error("Sunucuya ulaşılamadı.");
+  }
 
   if (response.status === 403) {
     handleUnauthorized();
-    throw new Error("The admin secret is missing or incorrect.");
+    throw new Error("Yönetici şifresi eksik veya hatalı.");
   }
 
   if (!response.ok) {
-    let errorMessage = `Download failed: ${response.status}`;
+    let errorMessage = "Dosya hazırlanamadı.";
 
     try {
       const data = await response.clone().json();
       if (typeof data?.error === "string") {
-        errorMessage = data.error;
+        errorMessage = getUserMessage(data.error, errorMessage);
       }
     } catch (error) {
-      errorMessage = `Download failed: ${response.status}`;
+      errorMessage = "Dosya hazırlanamadı.";
     }
 
     throw new Error(errorMessage);
@@ -674,17 +720,17 @@ async function downloadProtectedFile(url, fallbackName) {
 
 async function exportSelectedDay(date = dashboardState.selectedDate) {
   if (!date) {
-    setDashboardStatus("Select a date first.", "warning");
+    setDashboardStatus("Önce bir gün seçin.", "warning");
     return;
   }
 
   try {
-    setDashboardStatus(`Exporting XLSX for ${date}...`, "idle");
+    setDashboardStatus(`${date} günü için Excel dosyası hazırlanıyor...`, "idle");
     await downloadProtectedFile(
       `/api/attendance/daily-export-xlsx?date=${date}`,
       `attendance_${date}.xlsx`
     );
-    setDashboardStatus(`Daily XLSX export ready for ${date}.`, "success");
+    setDashboardStatus(`${date} günü için Excel dosyası hazır.`, "success");
   } catch (error) {
     setDashboardStatus(error.message, "error");
   }
@@ -692,17 +738,17 @@ async function exportSelectedDay(date = dashboardState.selectedDate) {
 
 async function exportSelectedMonth(month = dashboardState.selectedMonth) {
   if (!month) {
-    setDashboardStatus("Select a month first.", "warning");
+    setDashboardStatus("Önce bir ay seçin.", "warning");
     return;
   }
 
   try {
-    setDashboardStatus(`Exporting XLSX for ${month}...`, "idle");
+    setDashboardStatus(`${month} ayı için Excel dosyası hazırlanıyor...`, "idle");
     await downloadProtectedFile(
       `/api/attendance/monthly-export-xlsx?month=${month}`,
       `attendance_${month}.xlsx`
     );
-    setDashboardStatus(`Monthly XLSX export ready for ${month}.`, "success");
+    setDashboardStatus(`${month} ayı için Excel dosyası hazır.`, "success");
   } catch (error) {
     setDashboardStatus(error.message, "error");
   }
@@ -710,12 +756,12 @@ async function exportSelectedMonth(month = dashboardState.selectedMonth) {
 
 async function exportAllAttendance() {
   try {
-    setDashboardStatus("Exporting all attendance as XLSX...", "idle");
+    setDashboardStatus("Tüm kayıtlar için Excel dosyası hazırlanıyor...", "idle");
     await downloadProtectedFile(
       "/api/attendance/total-export-xlsx",
       "attendance_all.xlsx"
     );
-    setDashboardStatus("Total attendance XLSX export ready.", "success");
+    setDashboardStatus("Tüm kayıtlar için Excel dosyası hazır.", "success");
   } catch (error) {
     setDashboardStatus(error.message, "error");
   }
@@ -724,8 +770,8 @@ async function exportAllAttendance() {
 startButton.addEventListener("click", async () => {
   if (!adminSecret) {
     setPanelMessage(
-      "Admin secret required",
-      "Refresh the page and enter the admin secret to use the panel."
+      "Yönetici şifresi gerekli",
+      "Sayfayı yenileyip yönetici şifresini girin."
     );
     renderSession();
     return;
@@ -736,7 +782,7 @@ startButton.addEventListener("click", async () => {
   try {
     if (currentSession?.active) {
       const confirmed = window.confirm(
-        "A session is already active. Replace it with a new session?"
+        "Açık bir yoklama var. Yeni yoklama ile değiştirmek ister misiniz?"
       );
 
       if (!confirmed) {
@@ -760,8 +806,8 @@ startButton.addEventListener("click", async () => {
 endButton.addEventListener("click", async () => {
   if (!adminSecret) {
     setPanelMessage(
-      "Admin secret required",
-      "Refresh the page and enter the admin secret to use the panel."
+      "Yönetici şifresi gerekli",
+      "Sayfayı yenileyip yönetici şifresini girin."
     );
     renderSession();
     return;
@@ -876,9 +922,12 @@ async function initializePanel() {
 
 initializePanel().catch((error) => {
   if (!panelMessage) {
-    setPanelMessage("Panel unavailable", error.message);
+    setPanelMessage(
+      "Ekran açılamadı",
+      "Yoklama ekranı şu anda açılamıyor. Lütfen tekrar deneyin."
+    );
     renderSession();
   }
 
-  setDashboardStatus(error.message, "error");
+  setDashboardStatus("Yoklama ekranı şu anda açılamıyor.", "error");
 });

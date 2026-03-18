@@ -245,11 +245,11 @@ function requireAdmin(req, res, next) {
 
 function renderAdminBootstrapPage() {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Attendance QR Panel Access</title>
+    <title>Yönetici Girişi</title>
     <style>
       :root {
         color-scheme: light;
@@ -293,8 +293,8 @@ function renderAdminBootstrapPage() {
   </head>
   <body>
     <main class="bootstrap-card">
-      <h1>Attendance QR Panel</h1>
-      <p id="bootstrap-message">Checking admin access...</p>
+      <h1>Yoklama Ekranı</h1>
+      <p id="bootstrap-message">Yönetici girişi kontrol ediliyor...</p>
     </main>
     <script>
       const messageElement = document.getElementById("bootstrap-message");
@@ -316,12 +316,12 @@ function renderAdminBootstrapPage() {
 
       async function loadAdminPanel() {
         const secret = window.prompt(
-          "Enter the admin secret to open the Attendance QR Panel."
+          "Yoklama ekranını açmak için yönetici şifresini girin."
         );
 
         if (!secret || !secret.trim()) {
           showMessage(
-            "Admin secret is required. Refresh the page and enter the secret to continue."
+            "Yönetici şifresi gerekli. Sayfayı yenileyip tekrar deneyin."
           );
           return;
         }
@@ -332,12 +332,12 @@ function renderAdminBootstrapPage() {
           const pageResult = await fetchProtectedText("/", trimmedSecret);
 
           if (pageResult.response.status === 403) {
-            showMessage("The admin secret is missing or incorrect.");
+            showMessage("Yönetici şifresi eksik veya hatalı.");
             return;
           }
 
           if (!pageResult.response.ok) {
-            showMessage("Failed to load the admin panel.");
+            showMessage("Yoklama ekranı açılamadı.");
             return;
           }
 
@@ -350,12 +350,12 @@ function renderAdminBootstrapPage() {
             stylesResult.response.status === 403 ||
             scriptResult.response.status === 403
           ) {
-            showMessage("The admin secret is missing or incorrect.");
+            showMessage("Yönetici şifresi eksik veya hatalı.");
             return;
           }
 
           if (!stylesResult.response.ok || !scriptResult.response.ok) {
-            showMessage("Failed to load the admin panel.");
+            showMessage("Yoklama ekranı açılamadı.");
             return;
           }
 
@@ -392,7 +392,7 @@ function renderAdminBootstrapPage() {
           appScript.text = scriptResult.text;
           document.body.appendChild(appScript);
         } catch (error) {
-          showMessage("Failed to load the admin panel.");
+          showMessage("Yoklama ekranı açılamadı.");
         }
       }
 
