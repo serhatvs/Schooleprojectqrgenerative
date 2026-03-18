@@ -1,32 +1,12 @@
 # Attendance QR MVP
 
-Minimal web-based admin page for starting one attendance session and displaying its QR code.
+Minimal Node.js + Express backend for the attendance QR generator, admin panel, and public mobile scan endpoint.
 
-## Run
+## Endpoints
 
-In PowerShell:
-
-```powershell
-$env:ADMIN_SECRET="supersecret123"
-$env:ATTENDANCE_LOGS_DIR="./attendance_logs"
-npm.cmd install
-npm.cmd start
-```
-
-Then open `http://localhost:3000/admin`.
-
-## Project Structure
-
-```text
-.
-|-- package.json
-|-- server.js
-|-- public/
-|   |-- index.html
-|   |-- styles.css
-|   `-- app.js
-`-- README.md
-```
+- `/admin` is the admin panel.
+- `POST /api/attendance/scan` is the public student scan endpoint.
+- Session management endpoints remain unchanged and stay admin-protected.
 
 ## How It Works
 
@@ -34,31 +14,71 @@ Then open `http://localhost:3000/admin`.
 - `Start Session` creates a random `session_id`, current `start_time`, `expires_at` 10 minutes later, and marks the session as active.
 - The QR payload is encoded as JSON with `session_id`, `timestamp`, and `nonce`.
 - The server turns that payload into a QR image and sends it to the page as a data URL.
-- `End Session` marks the session inactive and removes the visible QR.
-- If the session passes its expiration time, both server and client treat it as expired and hide the QR.
-- `POST /api/attendance/scan` accepts mobile scan requests and returns `success`, `expired`, `duplicate_student`, `duplicate_device`, or `invalid_qr`.
+- Session metadata is synchronized into PostgreSQL and the latest valid active session is restored on startup.
+- `End Session` marks the session inactive in memory and in PostgreSQL.
+- `POST /api/attendance/scan` persists attendance to PostgreSQL and returns `success`, `expired`, `duplicate_student`, `duplicate_device`, or `invalid_qr`.
+- Duplicate protection is enforced by the current in-memory decision order plus PostgreSQL unique constraints on `(session_id, user_id)` and `(session_id, device_install_id)`.
 
-## Deployment
+## Local Run
 
-Required environment variables:
-
-- `ADMIN_SECRET`
-- `ATTENDANCE_LOGS_DIR` (optional)
-
-Railway setup:
-
-- Set `ADMIN_SECRET` in Railway Variables, for example `ADMIN_SECRET=supersecret123`.
-- Mount a volume at `/app/attendance_logs`.
-- Leave `ATTENDANCE_LOGS_DIR` unset to use the default `/app/attendance_logs`, or set it explicitly if you prefer.
-- The backend service can be public.
-- `POST /api/attendance/scan` remains public.
-- The admin panel and session endpoints require `x-admin-secret`.
-- Open the browser panel at `/admin`, then enter the admin secret when prompted.
-
-Local usage example:
+In PowerShell:
 
 ```powershell
 $env:ADMIN_SECRET="supersecret123"
-$env:ATTENDANCE_LOGS_DIR="./attendance_logs"
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/attendance"
+npm.cmd install
 npm.cmd start
 ```
+
+Then open `http://localhost:3000/admin`.
+
+## Railway Deployment
+
+Required Railway variables:
+
+```text
+ADMIN_SECRET=<your-secret>
+DATABASE_URL=<provided-by-railway-postgresql>
+```
+
+Deployment notes:
+
+- PostgreSQL is required.
+- Add Railway PostgreSQL to the project so `DATABASE_URL` is available to the backend service.
+- `ADMIN_SECRET` must be set.
+- `DATABASE_URL` must be set.
+- `/admin` is the admin panel.
+- `POST /api/attendance/scan` is the public student scan endpoint.
+- The backend service can remain public.
+- Admin routes remain protected by the current secret-based approach.
+- Volume-based NDJSON storage is no longer used after this migration.
+
+Production URLs:
+
+- Backend base URL: `https://schooleprojectqrgenerative-production.up.railway.app`
+- Admin panel: `https://schooleprojectqrgenerative-production.up.railway.app/admin`
+
+## How To Use
+
+Admin:
+
+1. Open `/admin`.
+2. Enter the current `ADMIN_SECRET`.
+3. Start a session.
+4. Show the generated QR code to students.
+5. End the session when attendance is finished.
+
+Student / mobile scanner:
+
+1. Open the mobile scanner app configured with the production backend URL.
+2. Enter the student `user_id`.
+3. Scan the active QR code from the admin panel.
+4. The app sends the request to `POST /api/attendance/scan`.
+5. The app displays the backend result message.
+
+## Persistence
+
+- Attendance records are now stored in PostgreSQL, not NDJSON files.
+- The backend creates the minimal `sessions` and `attendance_records` tables automatically on startup.
+- Session start/end updates the `sessions` table to keep PostgreSQL synchronized with the current in-memory session.
+- On startup, the backend restores the newest still-valid active session from PostgreSQL and rebuilds in-memory duplicate tracking from `attendance_records`.

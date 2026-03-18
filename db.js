@@ -1,0 +1,256 @@
+const { Pool } = require("pg");
+
+let pool = null;
+
+function getPool() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required.");
+  }
+
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+    });
+  }
+
+  return pool;
+}
+
+async function query(text, params = []) {
+  return getPool().query(text, params);
+}
+
+async function initDatabase() {
+  await query("SELECT 1");
+  await query(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id SERIAL PRIMARY KEY,
+      session_id TEXT NOT NULL UNIQUE,
+      start_time TIMESTAMPTZ NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS attendance_records (
+      id SERIAL PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      device_install_id TEXT NOT NULL,
+      device_install_password TEXT NOT NULL,
+      scan_time TIMESTAMPTZ NOT NULL,
+      wifi TEXT NOT NULL,
+      konum TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (session_id, user_id),
+      UNIQUE (session_id, device_install_id)
+    );
+  `);
+}
+
+async function expireStaleSessions() {
+  await query(
+    `
+      UPDATE sessions
+      SET active = FALSE, status = 'expired'
+      WHERE active = TRUE
+        AND status = 'active'
+        AND expires_at <= NOW();
+    `
+  );
+}
+
+async function upsertSessionRecord(session) {
+  await query(
+    `
+      INSERT INTO sessions (
+        session_id,
+        start_time,
+        expires_at,
+        status,
+        active
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (session_id)
+      DO UPDATE SET
+        start_time = EXCLUDED.start_time,
+        expires_at = EXCLUDED.expires_at,
+        status = EXCLUDED.status,
+        active = EXCLUDED.active;
+    `,
+    [
+      session.session_id,
+      session.start_time,
+      session.expires_at,
+      session.status,
+      session.active,
+    ]
+  );
+}
+
+async function replaceActiveSessionRecord(previousSessionId, nextSession) {
+  const client = await getPool().connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `
+        UPDATE sessions
+        SET active = FALSE, status = 'ended'
+        WHERE session_id = $1;
+      `,
+      [previousSessionId]
+    );
+    await client.query(
+      `
+        INSERT INTO sessions (
+          session_id,
+          start_time,
+          expires_at,
+          status,
+          active
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (session_id)
+        DO UPDATE SET
+          start_time = EXCLUDED.start_time,
+          expires_at = EXCLUDED.expires_at,
+          status = EXCLUDED.status,
+          active = EXCLUDED.active;
+      `,
+      [
+        nextSession.session_id,
+        nextSession.start_time,
+        nextSession.expires_at,
+        nextSession.status,
+        nextSession.active,
+      ]
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function markSessionEnded(sessionId, status) {
+  await query(
+    `
+      UPDATE sessions
+      SET active = FALSE, status = $2
+      WHERE session_id = $1;
+    `,
+    [sessionId, status]
+  );
+}
+
+async function insertAttendanceRecord(record) {
+  await query(
+    `
+      INSERT INTO attendance_records (
+        session_id,
+        user_id,
+        device_install_id,
+        device_install_password,
+        scan_time,
+        wifi,
+        konum
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7);
+    `,
+    [
+      record.session_id,
+      record.user_id,
+      record.device_install_id,
+      record.device_install_password,
+      record.scan_time,
+      record.wifi,
+      record.konum,
+    ]
+  );
+}
+
+async function findDuplicateStudent(sessionId, userId) {
+  const result = await query(
+    `
+      SELECT 1
+      FROM attendance_records
+      WHERE session_id = $1 AND user_id = $2
+      LIMIT 1;
+    `,
+    [sessionId, userId]
+  );
+
+  return result.rowCount > 0;
+}
+
+async function findDuplicateDevice(sessionId, deviceInstallId) {
+  const result = await query(
+    `
+      SELECT 1
+      FROM attendance_records
+      WHERE session_id = $1 AND device_install_id = $2
+      LIMIT 1;
+    `,
+    [sessionId, deviceInstallId]
+  );
+
+  return result.rowCount > 0;
+}
+
+async function restoreSessionFromDatabase() {
+  const sessionResult = await query(
+    `
+      SELECT session_id, start_time, expires_at, status, active
+      FROM sessions
+      WHERE active = TRUE
+        AND status = 'active'
+        AND expires_at > NOW()
+      ORDER BY start_time DESC
+      LIMIT 1;
+    `
+  );
+
+  if (sessionResult.rowCount === 0) {
+    return null;
+  }
+
+  const session = sessionResult.rows[0];
+  const attendanceResult = await query(
+    `
+      SELECT
+        session_id,
+        user_id,
+        device_install_id,
+        device_install_password,
+        scan_time,
+        wifi,
+        konum
+      FROM attendance_records
+      WHERE session_id = $1
+      ORDER BY created_at ASC, id ASC;
+    `,
+    [session.session_id]
+  );
+
+  return {
+    session,
+    attendanceRecords: attendanceResult.rows,
+  };
+}
+
+module.exports = {
+  expireStaleSessions,
+  findDuplicateDevice,
+  findDuplicateStudent,
+  initDatabase,
+  insertAttendanceRecord,
+  markSessionEnded,
+  replaceActiveSessionRecord,
+  restoreSessionFromDatabase,
+  upsertSessionRecord,
+};

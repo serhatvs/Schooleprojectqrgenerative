@@ -1,9 +1,20 @@
 const crypto = require("node:crypto");
-const fs = require("node:fs");
 const path = require("node:path");
 
 const express = require("express");
 const QRCode = require("qrcode");
+
+const {
+  expireStaleSessions,
+  findDuplicateDevice,
+  findDuplicateStudent,
+  initDatabase,
+  insertAttendanceRecord,
+  markSessionEnded,
+  replaceActiveSessionRecord,
+  restoreSessionFromDatabase,
+  upsertSessionRecord,
+} = require("./db");
 
 const PORT = Number(process.env.PORT) || 3000;
 const SESSION_DURATION_MS = 10 * 60 * 1000;
@@ -15,23 +26,32 @@ function createActiveSessionError(session) {
   return error;
 }
 
-async function buildSession() {
-  const startedAt = new Date();
-  const expiresAt = new Date(startedAt.getTime() + SESSION_DURATION_MS);
+function toIsoString(value) {
+  return new Date(value).toISOString();
+}
+
+async function createQrDataUrl(sessionId) {
   const qrPayload = {
-    session_id: crypto.randomUUID(),
-    timestamp: startedAt.toISOString(),
+    session_id: sessionId,
+    timestamp: new Date().toISOString(),
     nonce: crypto.randomBytes(12).toString("hex"),
   };
 
-  const qrDataUrl = await QRCode.toDataURL(JSON.stringify(qrPayload), {
+  return QRCode.toDataURL(JSON.stringify(qrPayload), {
     errorCorrectionLevel: "M",
     margin: 1,
     width: 420,
   });
+}
+
+async function buildSession() {
+  const startedAt = new Date();
+  const expiresAt = new Date(startedAt.getTime() + SESSION_DURATION_MS);
+  const sessionId = crypto.randomUUID();
+  const qrDataUrl = await createQrDataUrl(sessionId);
 
   return {
-    session_id: qrPayload.session_id,
+    session_id: sessionId,
     start_time: startedAt.toISOString(),
     expires_at: expiresAt.toISOString(),
     active: true,
@@ -40,6 +60,38 @@ async function buildSession() {
     studentIds: new Set(),
     deviceIds: new Set(),
     scanRecords: [],
+  };
+}
+
+async function buildRestoredSession(restoredSession) {
+  const qrDataUrl = await createQrDataUrl(restoredSession.session.session_id);
+  const studentIds = new Set();
+  const deviceIds = new Set();
+  const scanRecords = restoredSession.attendanceRecords.map((record) => {
+    studentIds.add(record.user_id);
+    deviceIds.add(record.device_install_id);
+
+    return {
+      user_id: record.user_id,
+      device_install_id: record.device_install_id,
+      device_install_password: record.device_install_password,
+      scan_time: toIsoString(record.scan_time),
+      wifi: record.wifi,
+      konum: record.konum,
+      session_id: record.session_id,
+    };
+  });
+
+  return {
+    session_id: restoredSession.session.session_id,
+    start_time: toIsoString(restoredSession.session.start_time),
+    expires_at: toIsoString(restoredSession.session.expires_at),
+    active: restoredSession.session.active,
+    status: restoredSession.session.status,
+    qr_data_url: qrDataUrl,
+    studentIds,
+    deviceIds,
+    scanRecords,
   };
 }
 
@@ -56,22 +108,6 @@ function hasValidScanPayload(payload) {
     isNonEmptyString(payload?.wifi) &&
     isNonEmptyString(payload?.konum) &&
     isNonEmptyString(payload?.session_id)
-  );
-}
-
-function getAttendanceLogsDir() {
-  return process.env.ATTENDANCE_LOGS_DIR || "/app/attendance_logs";
-}
-
-function getSessionLogPath(sessionId) {
-  return path.join(getAttendanceLogsDir(), `session_${sessionId}.ndjson`);
-}
-
-function appendScanRecord(sessionId, record) {
-  fs.mkdirSync(getAttendanceLogsDir(), { recursive: true });
-  fs.appendFileSync(
-    getSessionLogPath(sessionId),
-    `${JSON.stringify(record)}\n`
   );
 }
 
@@ -248,7 +284,7 @@ function renderAdminBootstrapPage() {
 function createSessionStore() {
   let currentSession = null;
 
-  function normalizeSession() {
+  async function normalizeSession() {
     if (!currentSession) {
       return null;
     }
@@ -258,6 +294,7 @@ function createSessionStore() {
       Date.now() >= Date.parse(currentSession.expires_at);
 
     if (hasExpired) {
+      await markSessionEnded(currentSession.session_id, "expired");
       currentSession = {
         ...currentSession,
         active: false,
@@ -269,28 +306,45 @@ function createSessionStore() {
     return currentSession;
   }
 
+  function rollbackScanRecord(session, scanRecord) {
+    session.studentIds.delete(scanRecord.user_id);
+    session.deviceIds.delete(scanRecord.device_install_id);
+    session.scanRecords.pop();
+  }
+
   return {
-    get() {
+    async get() {
       return normalizeSession();
     },
+    restore(session) {
+      currentSession = session;
+    },
     async start(replaceActive = false) {
-      const session = normalizeSession();
+      const session = await normalizeSession();
 
       if (session?.active && !replaceActive) {
         throw createActiveSessionError(session);
       }
 
-      currentSession = await buildSession();
+      const nextSession = await buildSession();
+
+      if (session?.active && replaceActive) {
+        await replaceActiveSessionRecord(session.session_id, nextSession);
+      } else {
+        await upsertSessionRecord(nextSession);
+      }
+      currentSession = nextSession;
       return currentSession;
     },
-    end() {
-      const session = normalizeSession();
+    async end() {
+      const session = await normalizeSession();
 
       if (!session) {
         return null;
       }
 
       if (session.active) {
+        await markSessionEnded(session.session_id, "ended");
         currentSession = {
           ...session,
           active: false,
@@ -301,8 +355,8 @@ function createSessionStore() {
 
       return currentSession;
     },
-    recordScan(payload) {
-      const session = normalizeSession();
+    async recordScan(payload) {
+      const session = await normalizeSession();
 
       if (
         !session ||
@@ -331,22 +385,37 @@ function createSessionStore() {
       const scanRecord = {
         user_id: payload.user_id,
         device_install_id: payload.device_install_id,
+        device_install_password: payload.device_install_password,
         scan_time: payload.scan_time,
         wifi: payload.wifi,
         konum: payload.konum,
         session_id: payload.session_id,
       };
 
-      session.studentIds.add(payload.user_id);
-      session.deviceIds.add(payload.device_install_id);
+      session.studentIds.add(scanRecord.user_id);
+      session.deviceIds.add(scanRecord.device_install_id);
       session.scanRecords.push(scanRecord);
 
       try {
-        appendScanRecord(session.session_id, scanRecord);
+        await insertAttendanceRecord(scanRecord);
       } catch (error) {
-        session.studentIds.delete(payload.user_id);
-        session.deviceIds.delete(payload.device_install_id);
-        session.scanRecords.pop();
+        rollbackScanRecord(session, scanRecord);
+
+        if (error.code === "23505") {
+          if (await findDuplicateStudent(session.session_id, payload.user_id)) {
+            return { status: "duplicate_student" };
+          }
+
+          if (
+            await findDuplicateDevice(
+              session.session_id,
+              payload.device_install_id
+            )
+          ) {
+            return { status: "duplicate_device" };
+          }
+        }
+
         console.error("Failed to persist attendance scan:", error);
         throw error;
       }
@@ -376,6 +445,7 @@ function createApp() {
   const store = createSessionStore();
   const publicDir = path.join(__dirname, "public");
 
+  app.locals.store = store;
   app.use(express.json());
 
   app.get("/admin", (req, res) => {
@@ -390,8 +460,13 @@ function createApp() {
     res.sendFile(path.join(publicDir, "index.html"));
   });
 
-  app.get("/api/session", requireAdminSecret, (req, res) => {
-    res.json(serializeSession(store.get()));
+  app.get("/api/session", requireAdminSecret, async (req, res) => {
+    try {
+      res.json(serializeSession(await store.get()));
+    } catch (error) {
+      console.error("Failed to load session:", error);
+      res.status(500).json({ error: "Failed to load session." });
+    }
   });
 
   app.post("/api/session/start", requireAdminSecret, async (req, res) => {
@@ -409,13 +484,18 @@ function createApp() {
     }
   });
 
-  app.post("/api/session/end", requireAdminSecret, (req, res) => {
-    res.json(serializeSession(store.end()));
+  app.post("/api/session/end", requireAdminSecret, async (req, res) => {
+    try {
+      res.json(serializeSession(await store.end()));
+    } catch (error) {
+      console.error("Failed to end session:", error);
+      res.status(500).json({ error: "Failed to end session." });
+    }
   });
 
-  app.post("/api/attendance/scan", (req, res) => {
+  app.post("/api/attendance/scan", async (req, res) => {
     try {
-      res.json(store.recordScan(req.body));
+      res.json(await store.recordScan(req.body));
     } catch (error) {
       res.status(500).json({ status: "server_error" });
     }
@@ -426,12 +506,43 @@ function createApp() {
   return app;
 }
 
-if (require.main === module) {
+async function restoreCurrentSession(store) {
+  try {
+    const restoredSession = await restoreSessionFromDatabase();
+
+    if (!restoredSession) {
+      console.log("No active session to restore");
+      return;
+    }
+
+    const currentSession = await buildRestoredSession(restoredSession);
+    store.restore(currentSession);
+    console.log("Session restored successfully", {
+      session_id: currentSession.session_id,
+      restored_students: currentSession.studentIds.size,
+    });
+  } catch (error) {
+    console.error("Failed to restore session from database:", error);
+  }
+}
+
+async function bootstrap() {
+  await initDatabase();
+  await expireStaleSessions();
+
   const app = createApp();
+  await restoreCurrentSession(app.locals.store);
 
   app.listen(PORT, () => {
     console.log(`Attendance QR Panel running at http://localhost:${PORT}`);
   });
 }
 
-module.exports = { createApp };
+if (require.main === module) {
+  bootstrap().catch((error) => {
+    console.error("Failed to initialize server:", error);
+    process.exit(1);
+  });
+}
+
+module.exports = { bootstrap, buildRestoredSession, buildSession, createApp };
