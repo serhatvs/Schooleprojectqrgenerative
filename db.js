@@ -202,6 +202,76 @@ async function findDuplicateDevice(sessionId, deviceInstallId) {
   return result.rowCount > 0;
 }
 
+async function getDailyAttendanceView(date) {
+  const result = await query(
+    `
+      SELECT
+        session_id,
+        user_id,
+        device_install_id,
+        TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
+        TO_CHAR(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
+        wifi,
+        konum
+      FROM attendance_records
+      WHERE TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD') = $1
+      ORDER BY attendance_records.created_at ASC, attendance_records.id ASC;
+    `,
+    [date]
+  );
+
+  return result.rows;
+}
+
+async function getMonthlyAttendanceView(month) {
+  const result = await query(
+    `
+      SELECT
+        session_id,
+        user_id,
+        device_install_id,
+        TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
+        TO_CHAR(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
+        wifi,
+        konum
+      FROM attendance_records
+      WHERE TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $1
+      ORDER BY attendance_records.created_at ASC, attendance_records.id ASC;
+    `,
+    [month]
+  );
+
+  return result.rows;
+}
+
+async function getDailyAttendanceSummary() {
+  const result = await query(`
+    SELECT
+      TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD') AS date,
+      COUNT(DISTINCT session_id)::int AS session_count,
+      COUNT(*)::int AS attendance_count
+    FROM attendance_records
+    GROUP BY TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD')
+    ORDER BY date DESC;
+  `);
+
+  return result.rows;
+}
+
+async function getMonthlyAttendanceSummary() {
+  const result = await query(`
+    SELECT
+      TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') AS month,
+      COUNT(DISTINCT session_id)::int AS session_count,
+      COUNT(*)::int AS attendance_count
+    FROM attendance_records
+    GROUP BY TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')
+    ORDER BY month DESC;
+  `);
+
+  return result.rows;
+}
+
 async function restoreSessionFromDatabase() {
   const sessionResult = await query(
     `
@@ -252,6 +322,10 @@ module.exports = {
   expireStaleSessions,
   findDuplicateDevice,
   findDuplicateStudent,
+  getDailyAttendanceSummary,
+  getDailyAttendanceView,
+  getMonthlyAttendanceSummary,
+  getMonthlyAttendanceView,
   initDatabase,
   insertAttendanceRecord,
   markSessionEnded,

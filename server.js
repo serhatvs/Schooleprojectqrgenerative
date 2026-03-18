@@ -8,6 +8,10 @@ const {
   expireStaleSessions,
   findDuplicateDevice,
   findDuplicateStudent,
+  getDailyAttendanceSummary,
+  getDailyAttendanceView,
+  getMonthlyAttendanceSummary,
+  getMonthlyAttendanceView,
   initDatabase,
   insertAttendanceRecord,
   markSessionEnded,
@@ -18,6 +22,8 @@ const {
 
 const PORT = Number(process.env.PORT) || 3000;
 const SESSION_DURATION_MS = 10 * 60 * 1000;
+const DATE_QUERY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const MONTH_QUERY_REGEX = /^\d{4}-\d{2}$/;
 
 function createActiveSessionError(session) {
   const error = new Error("An active session already exists.");
@@ -109,6 +115,26 @@ function hasValidScanPayload(payload) {
     isNonEmptyString(payload?.konum) &&
     isNonEmptyString(payload?.session_id)
   );
+}
+
+function isValidDateQuery(value) {
+  if (!isNonEmptyString(value) || !DATE_QUERY_REGEX.test(value)) {
+    return false;
+  }
+
+  const parsed = new Date(`${value}T00:00:00Z`);
+
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function isValidMonthQuery(value) {
+  if (!isNonEmptyString(value) || !MONTH_QUERY_REGEX.test(value)) {
+    return false;
+  }
+
+  const month = Number(value.slice(5, 7));
+
+  return month >= 1 && month <= 12;
 }
 
 function requireAdminSecret(req, res, next) {
@@ -490,6 +516,54 @@ function createApp() {
     } catch (error) {
       console.error("Failed to end session:", error);
       res.status(500).json({ error: "Failed to end session." });
+    }
+  });
+
+  app.get("/api/attendance/daily-view", requireAdminSecret, async (req, res) => {
+    const { date } = req.query;
+
+    if (!isValidDateQuery(date)) {
+      return res.status(400).json({ error: "invalid_date" });
+    }
+
+    try {
+      res.json(await getDailyAttendanceView(date));
+    } catch (error) {
+      console.error("Failed to load daily attendance view:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
+  app.get("/api/attendance/monthly-view", requireAdminSecret, async (req, res) => {
+    const { month } = req.query;
+
+    if (!isValidMonthQuery(month)) {
+      return res.status(400).json({ error: "invalid_month" });
+    }
+
+    try {
+      res.json(await getMonthlyAttendanceView(month));
+    } catch (error) {
+      console.error("Failed to load monthly attendance view:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
+  app.get("/api/attendance/daily-summary", requireAdminSecret, async (req, res) => {
+    try {
+      res.json(await getDailyAttendanceSummary());
+    } catch (error) {
+      console.error("Failed to load daily attendance summary:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
+  app.get("/api/attendance/monthly-summary", requireAdminSecret, async (req, res) => {
+    try {
+      res.json(await getMonthlyAttendanceSummary());
+    } catch (error) {
+      console.error("Failed to load monthly attendance summary:", error);
+      res.status(500).json({ error: "server_error" });
     }
   });
 

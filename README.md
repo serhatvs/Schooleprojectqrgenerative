@@ -7,6 +7,11 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
 - `/admin` is the admin panel.
 - `POST /api/attendance/scan` is the public student scan endpoint.
 - Session management endpoints remain unchanged and stay admin-protected.
+- Attendance reporting endpoints remain admin-protected:
+  - `GET /api/attendance/daily-view?date=YYYY-MM-DD`
+  - `GET /api/attendance/monthly-view?month=YYYY-MM`
+  - `GET /api/attendance/daily-summary`
+  - `GET /api/attendance/monthly-summary`
 
 ## How It Works
 
@@ -18,6 +23,9 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
 - `End Session` marks the session inactive in memory and in PostgreSQL.
 - `POST /api/attendance/scan` persists attendance to PostgreSQL and returns `success`, `expired`, `duplicate_student`, `duplicate_device`, or `invalid_qr`.
 - Duplicate protection is enforced by the current in-memory decision order plus PostgreSQL unique constraints on `(session_id, user_id)` and `(session_id, device_install_id)`.
+- Attendance reporting/export endpoints read directly from `attendance_records`.
+- Daily and monthly filtering/grouping use Turkey-local `scan_time`.
+- View endpoints return `scan_time` and `created_at` in `Europe/Istanbul` formatted as `YYYY-MM-DD HH:mm`.
 
 ## Local Run
 
@@ -75,6 +83,14 @@ Student / mobile scanner:
 3. Scan the active QR code from the admin panel.
 4. The app sends the request to `POST /api/attendance/scan`.
 5. The app displays the backend result message.
+
+Reporting / export:
+
+1. Send the existing `x-admin-secret` header with each request.
+2. Use `/api/attendance/daily-view?date=2026-03-18` for detailed rows from a single Turkey-local day.
+3. Use `/api/attendance/monthly-view?month=2026-03` for detailed rows from a single Turkey-local month.
+4. Use `/api/attendance/daily-summary` for grouped daily totals.
+5. Use `/api/attendance/monthly-summary` for grouped monthly totals.
 
 ## Persistence
 
