@@ -19,6 +19,7 @@ const RESULT_MESSAGES = {
   starting: { text: "Kamera baslatiliyor...", tone: "idle" },
   getting_location: { text: "Konum aliniyor...", tone: "idle" },
 };
+const LOCATION_REQUIRED_ERROR = "Konum izni gerekli";
 
 const RESUME_DELAY_MS = 3000;
 const scannerReader = document.getElementById("scanner-reader");
@@ -174,7 +175,7 @@ async function getKonum() {
 
     return `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
   } catch (error) {
-    throw new Error("Konum izni gerekli");
+    throw new Error(LOCATION_REQUIRED_ERROR);
   }
 }
 
@@ -321,9 +322,8 @@ function resumeScanningSoon() {
   }, RESUME_DELAY_MS);
 }
 
-async function submitAttendance(sessionId) {
+async function submitAttendance(sessionId, konum) {
   const { deviceInstallId, deviceInstallPassword } = ensureDeviceCredentials();
-  const konum = await getKonum();
 
   const response = await fetch(`${window.location.origin}/api/attendance/scan`, {
     method: "POST",
@@ -378,10 +378,11 @@ async function processDecodedText(decodedText) {
       RESULT_MESSAGES.getting_location.text,
       RESULT_MESSAGES.getting_location.tone
     );
-    const outcome = await submitAttendance(qrResult.sessionId);
+    const konum = await getKonum();
+    const outcome = await submitAttendance(qrResult.sessionId, konum);
     setResult(outcome.text, outcome.tone);
   } catch (error) {
-    if (error instanceof Error && error.message === "Konum izni gerekli") {
+    if (error instanceof Error && error.message === LOCATION_REQUIRED_ERROR) {
       setResult(
         RESULT_MESSAGES.location_required.text,
         RESULT_MESSAGES.location_required.tone

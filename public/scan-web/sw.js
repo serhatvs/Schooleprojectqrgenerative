@@ -1,4 +1,4 @@
-const CACHE_NAME = "attendance-scan-web-v1";
+const CACHE_NAME = "attendance-scan-web-v2";
 const APP_ASSETS = [
   "/scan-web",
   "/scan-web/",
