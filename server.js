@@ -1,6 +1,7 @@
 const crypto = require("node:crypto");
 const path = require("node:path");
 
+const ExcelJS = require("exceljs");
 const express = require("express");
 const QRCode = require("qrcode");
 
@@ -36,6 +37,8 @@ const MONTH_QUERY_REGEX = /^\d{4}-\d{2}$/;
 const SCHOOL_LATITUDE = 38.73884317007882;
 const SCHOOL_LONGITUDE = 35.47434393140808;
 const SCHOOL_RADIUS_METERS = 600;
+const XLSX_CONTENT_TYPE =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 function createActiveSessionError(session) {
   const error = new Error("An active session already exists.");
@@ -603,6 +606,160 @@ function buildAttendanceCsv(rows) {
   return `\uFEFF${[header, ...lines].join("\r\n")}`;
 }
 
+const ATTENDANCE_EXPORT_COLUMNS = [
+  { header: "session_id", key: "session_id", width: 38 },
+  { header: "user_id", key: "user_id", width: 18 },
+  { header: "device_install_id", key: "device_install_id", width: 38 },
+  { header: "scan_time", key: "scan_time", width: 18, horizontal: "center" },
+  { header: "created_at", key: "created_at", width: 18, horizontal: "center" },
+  { header: "konum", key: "konum", width: 24, wrapText: true },
+  {
+    header: "is_in_school",
+    key: "is_in_school",
+    width: 14,
+    horizontal: "center",
+    value: (row) => (row.is_in_school === false ? "No" : "Yes"),
+  },
+  {
+    header: "distance_meters",
+    key: "distance_meters",
+    width: 16,
+    horizontal: "center",
+    numFmt: "0.0",
+    value: (row) => {
+      const numericValue = Number(row.distance_meters);
+
+      return Number.isFinite(numericValue) ? numericValue : null;
+    },
+  },
+  { header: "flag_reason", key: "flag_reason", width: 20, wrapText: true },
+];
+
+function styleWorksheetHeader(row) {
+  row.font = {
+    bold: true,
+    color: { argb: "FF1F2937" },
+  };
+  row.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFE5E7EB" },
+  };
+  row.alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+}
+
+function getAttendanceWorksheetRowValues(row) {
+  return ATTENDANCE_EXPORT_COLUMNS.reduce((values, column) => {
+    values[column.key] =
+      typeof column.value === "function" ? column.value(row) : (row[column.key] ?? "");
+    return values;
+  }, {});
+}
+
+function styleAttendanceWorksheetRow(worksheetRow, row) {
+  ATTENDANCE_EXPORT_COLUMNS.forEach((column, index) => {
+    const cell = worksheetRow.getCell(index + 1);
+    cell.alignment = {
+      vertical: "middle",
+      horizontal: column.horizontal ?? "left",
+      wrapText: Boolean(column.wrapText),
+    };
+
+    if (column.numFmt) {
+      cell.numFmt = column.numFmt;
+    }
+  });
+
+  if (row.is_in_school === false) {
+    worksheetRow.eachCell({ includeEmpty: true }, (cell) => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFFF7D6" },
+      };
+    });
+  }
+}
+
+function addAttendanceWorksheet(workbook, sheetName, rows) {
+  const worksheet = workbook.addWorksheet(sheetName);
+  worksheet.columns = ATTENDANCE_EXPORT_COLUMNS.map((column) => ({
+    header: column.header,
+    key: column.key,
+    width: column.width,
+  }));
+  worksheet.views = [{ state: "frozen", ySplit: 1 }];
+  worksheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: ATTENDANCE_EXPORT_COLUMNS.length },
+  };
+  styleWorksheetHeader(worksheet.getRow(1));
+
+  rows.forEach((row) => {
+    const worksheetRow = worksheet.addRow(getAttendanceWorksheetRowValues(row));
+    styleAttendanceWorksheetRow(worksheetRow, row);
+  });
+
+  return worksheet;
+}
+
+function addTotalSummaryWorksheet(workbook, rows) {
+  const worksheet = workbook.addWorksheet("Summary");
+  const flaggedCount = rows.filter(
+    (row) => row.is_in_school === false || Boolean(row.flag_reason)
+  ).length;
+  const summaryRows = [
+    { metric: "total_attendance_count", value: rows.length },
+    { metric: "flagged_count", value: flaggedCount },
+    { metric: "in_school_count", value: rows.length - flaggedCount },
+    { metric: "session_count", value: new Set(rows.map((row) => row.session_id)).size },
+  ];
+
+  worksheet.columns = [
+    { header: "metric", key: "metric", width: 24 },
+    { header: "value", key: "value", width: 16 },
+  ];
+  worksheet.views = [{ state: "frozen", ySplit: 1 }];
+  worksheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: 2 },
+  };
+  styleWorksheetHeader(worksheet.getRow(1));
+  summaryRows.forEach((row) => worksheet.addRow(row));
+  worksheet.getColumn("value").alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+}
+
+async function buildAttendanceWorkbookBuffer(rows, options) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Attendance QR Admin Panel";
+  workbook.created = new Date();
+  workbook.modified = new Date();
+  workbook.subject = options.subject;
+  workbook.title = options.title;
+
+  if (options.includeSummarySheet) {
+    addTotalSummaryWorksheet(workbook, rows);
+  }
+
+  addAttendanceWorksheet(workbook, options.sheetName, rows);
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+}
+
+async function sendAttendanceWorkbook(res, rows, options) {
+  const workbookBuffer = await buildAttendanceWorkbookBuffer(rows, options);
+  res.setHeader("Content-Type", XLSX_CONTENT_TYPE);
+  res.setHeader("Content-Disposition", `attachment; filename="${options.filename}"`);
+  res.send(workbookBuffer);
+}
+
 function createApp() {
   const app = express();
   const store = createSessionStore();
@@ -750,6 +907,27 @@ function createApp() {
     }
   });
 
+  app.get("/api/attendance/daily-export-xlsx", requireAdmin, async (req, res) => {
+    const { date } = req.query;
+
+    if (!isValidDateQuery(date)) {
+      return res.status(400).json({ error: "invalid_date" });
+    }
+
+    try {
+      const rows = await getDailyAttendanceExportRows(date);
+      await sendAttendanceWorkbook(res, rows, {
+        filename: `attendance_${date}.xlsx`,
+        sheetName: "Attendance",
+        subject: `Daily attendance export for ${date}`,
+        title: `Attendance ${date}`,
+      });
+    } catch (error) {
+      console.error("Failed to export daily attendance workbook:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
   app.get("/api/attendance/monthly-export", requireAdmin, async (req, res) => {
     const { month } = req.query;
 
@@ -771,6 +949,27 @@ function createApp() {
     }
   });
 
+  app.get("/api/attendance/monthly-export-xlsx", requireAdmin, async (req, res) => {
+    const { month } = req.query;
+
+    if (!isValidMonthQuery(month)) {
+      return res.status(400).json({ error: "invalid_month" });
+    }
+
+    try {
+      const rows = await getMonthlyAttendanceExportRows(month);
+      await sendAttendanceWorkbook(res, rows, {
+        filename: `attendance_${month}.xlsx`,
+        sheetName: "Attendance",
+        subject: `Monthly attendance export for ${month}`,
+        title: `Attendance ${month}`,
+      });
+    } catch (error) {
+      console.error("Failed to export monthly attendance workbook:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
   app.get("/api/attendance/total-export", requireAdmin, async (req, res) => {
     try {
       const rows = await getTotalAttendanceExportRows();
@@ -782,6 +981,22 @@ function createApp() {
       res.send(buildAttendanceCsv(rows));
     } catch (error) {
       console.error("Failed to export total attendance:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
+  app.get("/api/attendance/total-export-xlsx", requireAdmin, async (req, res) => {
+    try {
+      const rows = await getTotalAttendanceExportRows();
+      await sendAttendanceWorkbook(res, rows, {
+        filename: "attendance_all.xlsx",
+        sheetName: "Attendance",
+        subject: "Total attendance export",
+        title: "Attendance All",
+        includeSummarySheet: true,
+      });
+    } catch (error) {
+      console.error("Failed to export total attendance workbook:", error);
       res.status(500).json({ error: "server_error" });
     }
   });

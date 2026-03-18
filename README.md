@@ -14,8 +14,11 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
   - `GET /api/attendance/daily-summary`
   - `GET /api/attendance/monthly-summary`
   - `GET /api/attendance/daily-export?date=YYYY-MM-DD`
+  - `GET /api/attendance/daily-export-xlsx?date=YYYY-MM-DD`
   - `GET /api/attendance/monthly-export?month=YYYY-MM`
+  - `GET /api/attendance/monthly-export-xlsx?month=YYYY-MM`
   - `GET /api/attendance/total-export`
+  - `GET /api/attendance/total-export-xlsx`
 
 ## How It Works
 
@@ -32,7 +35,8 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
 - Daily/monthly view and export outputs include `is_in_school`, `distance_meters`, and `flag_reason` for admin review.
 - Daily and monthly filtering/grouping use Turkey-local `scan_time`.
 - View endpoints return `scan_time` and `created_at` in `Europe/Istanbul` formatted as `YYYY-MM-DD HH:mm`.
-- Export endpoints return BOM-prefixed CSV downloads with the same timestamp formatting.
+- CSV export endpoints return BOM-prefixed CSV downloads with the same timestamp formatting.
+- XLSX export endpoints return formatted Excel workbooks with bold headers, frozen header rows, autofilter, and flagged-row highlighting.
 
 ## Local Run
 
@@ -85,6 +89,8 @@ Admin:
 5. Use the export buttons for selected day, selected month, or total attendance.
 6. End the session when attendance is finished.
 
+Dashboard export buttons download XLSX files by default. Legacy CSV endpoints remain available for manual use.
+
 Student / mobile scanner:
 
 1. Open the mobile scanner app configured with the production backend URL.
@@ -124,15 +130,21 @@ Reporting / export:
 4. Use `/api/attendance/daily-summary` for grouped daily totals.
 5. Use `/api/attendance/monthly-summary` for grouped monthly totals.
 6. Use `/api/attendance/daily-export?date=2026-03-18` to download a CSV export for one day.
-7. Use `/api/attendance/monthly-export?month=2026-03` to download a CSV export for one month.
-8. Use `/api/attendance/total-export` to download all attendance rows.
+7. Use `/api/attendance/daily-export-xlsx?date=2026-03-18` to download an XLSX export for one day.
+8. Use `/api/attendance/monthly-export?month=2026-03` to download a CSV export for one month.
+9. Use `/api/attendance/monthly-export-xlsx?month=2026-03` to download an XLSX export for one month.
+10. Use `/api/attendance/total-export` to download all attendance rows as CSV.
+11. Use `/api/attendance/total-export-xlsx` to download all attendance rows as XLSX.
 
 Example curl usage:
 
 ```bash
 curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/daily-export?date=2026-03-18"
+curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/daily-export-xlsx?date=2026-03-18"
 curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/monthly-export?month=2026-03"
+curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/monthly-export-xlsx?month=2026-03"
 curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/total-export"
+curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendance/total-export-xlsx"
 ```
 
 ## Persistence

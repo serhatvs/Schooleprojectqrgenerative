@@ -315,7 +315,7 @@ function renderDailySummaryTable() {
                 data-action="export-day"
                 data-date="${escapeHtml(row.date)}"
               >
-                Export
+                Export XLSX
               </button>
             </div>
           </td>
@@ -358,7 +358,7 @@ function renderMonthlySummaryTable() {
                 data-action="export-month"
                 data-month="${escapeHtml(row.month)}"
               >
-                Export
+                Export XLSX
               </button>
             </div>
           </td>
@@ -647,7 +647,18 @@ async function downloadProtectedFile(url, fallbackName) {
   }
 
   if (!response.ok) {
-    throw new Error(`Download failed: ${response.status}`);
+    let errorMessage = `Download failed: ${response.status}`;
+
+    try {
+      const data = await response.clone().json();
+      if (typeof data?.error === "string") {
+        errorMessage = data.error;
+      }
+    } catch (error) {
+      errorMessage = `Download failed: ${response.status}`;
+    }
+
+    throw new Error(errorMessage);
   }
 
   const blob = await response.blob();
@@ -668,12 +679,12 @@ async function exportSelectedDay(date = dashboardState.selectedDate) {
   }
 
   try {
-    setDashboardStatus(`Exporting ${date}...`, "idle");
+    setDashboardStatus(`Exporting XLSX for ${date}...`, "idle");
     await downloadProtectedFile(
-      `/api/attendance/daily-export?date=${date}`,
-      `attendance_${date}.csv`
+      `/api/attendance/daily-export-xlsx?date=${date}`,
+      `attendance_${date}.xlsx`
     );
-    setDashboardStatus(`Daily export ready for ${date}.`, "success");
+    setDashboardStatus(`Daily XLSX export ready for ${date}.`, "success");
   } catch (error) {
     setDashboardStatus(error.message, "error");
   }
@@ -686,12 +697,12 @@ async function exportSelectedMonth(month = dashboardState.selectedMonth) {
   }
 
   try {
-    setDashboardStatus(`Exporting ${month}...`, "idle");
+    setDashboardStatus(`Exporting XLSX for ${month}...`, "idle");
     await downloadProtectedFile(
-      `/api/attendance/monthly-export?month=${month}`,
-      `attendance_${month}.csv`
+      `/api/attendance/monthly-export-xlsx?month=${month}`,
+      `attendance_${month}.xlsx`
     );
-    setDashboardStatus(`Monthly export ready for ${month}.`, "success");
+    setDashboardStatus(`Monthly XLSX export ready for ${month}.`, "success");
   } catch (error) {
     setDashboardStatus(error.message, "error");
   }
@@ -699,12 +710,12 @@ async function exportSelectedMonth(month = dashboardState.selectedMonth) {
 
 async function exportAllAttendance() {
   try {
-    setDashboardStatus("Exporting all attendance...", "idle");
+    setDashboardStatus("Exporting all attendance as XLSX...", "idle");
     await downloadProtectedFile(
-      "/api/attendance/total-export",
-      "attendance_total.csv"
+      "/api/attendance/total-export-xlsx",
+      "attendance_all.xlsx"
     );
-    setDashboardStatus("Total attendance export ready.", "success");
+    setDashboardStatus("Total attendance XLSX export ready.", "success");
   } catch (error) {
     setDashboardStatus(error.message, "error");
   }
