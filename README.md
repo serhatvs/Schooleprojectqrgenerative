@@ -25,8 +25,10 @@ Minimal Node.js + Express backend for the attendance QR generator, admin panel, 
 - Session metadata is synchronized into PostgreSQL and the latest valid active session is restored on startup.
 - `End Session` marks the session inactive in memory and in PostgreSQL.
 - `POST /api/attendance/scan` persists attendance to PostgreSQL and returns `success`, `expired`, `duplicate_student`, `duplicate_device`, or `invalid_qr`.
+- Attendance scans outside the 600 meter radius of `38.73884317007882, 35.47434393140808` are still recorded, but flagged for admin/audit review, while the student still receives `success`.
 - Duplicate protection is enforced by the current in-memory decision order plus PostgreSQL unique constraints on `(session_id, user_id)` and `(session_id, device_install_id)`.
 - Attendance reporting/export endpoints read directly from `attendance_records`.
+- Daily/monthly view and export outputs include `is_in_school`, `distance_meters`, and `flag_reason` for admin review.
 - Daily and monthly filtering/grouping use Turkey-local `scan_time`.
 - View endpoints return `scan_time` and `created_at` in `Europe/Istanbul` formatted as `YYYY-MM-DD HH:mm`.
 - Export endpoints return BOM-prefixed CSV downloads with the same timestamp formatting.
@@ -133,5 +135,6 @@ curl -H "x-admin-secret: supersecret123" -OJ "http://localhost:3000/api/attendan
 - Attendance records are now stored in PostgreSQL, not NDJSON files.
 - The backend creates the minimal `sessions` and `attendance_records` tables automatically on startup.
 - Database initialization safely runs `ALTER TABLE attendance_records DROP COLUMN IF EXISTS wifi;`.
+- Database initialization also safely adds `is_in_school`, `distance_meters`, and `flag_reason` if they are missing.
 - Session start/end updates the `sessions` table to keep PostgreSQL synchronized with the current in-memory session.
 - On startup, the backend restores the newest still-valid active session from PostgreSQL and rebuilds in-memory duplicate tracking from `attendance_records`.

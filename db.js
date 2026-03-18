@@ -42,6 +42,9 @@ async function initDatabase() {
       device_install_password TEXT NOT NULL,
       scan_time TIMESTAMPTZ NOT NULL,
       konum TEXT NOT NULL,
+      is_in_school BOOLEAN NOT NULL DEFAULT TRUE,
+      distance_meters DOUBLE PRECISION,
+      flag_reason TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (session_id, user_id),
       UNIQUE (session_id, device_install_id)
@@ -50,6 +53,18 @@ async function initDatabase() {
   await query(`
     ALTER TABLE attendance_records
     DROP COLUMN IF EXISTS wifi;
+  `);
+  await query(`
+    ALTER TABLE attendance_records
+    ADD COLUMN IF NOT EXISTS is_in_school BOOLEAN NOT NULL DEFAULT TRUE;
+  `);
+  await query(`
+    ALTER TABLE attendance_records
+    ADD COLUMN IF NOT EXISTS distance_meters DOUBLE PRECISION;
+  `);
+  await query(`
+    ALTER TABLE attendance_records
+    ADD COLUMN IF NOT EXISTS flag_reason TEXT;
   `);
 }
 
@@ -160,9 +175,12 @@ async function insertAttendanceRecord(record) {
         device_install_id,
         device_install_password,
         scan_time,
-        konum
+        konum,
+        is_in_school,
+        distance_meters,
+        flag_reason
       )
-      VALUES ($1, $2, $3, $4, $5, $6);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
     `,
     [
       record.session_id,
@@ -171,6 +189,9 @@ async function insertAttendanceRecord(record) {
       record.device_install_password,
       record.scan_time,
       record.konum,
+      record.is_in_school,
+      record.distance_meters,
+      record.flag_reason,
     ]
   );
 }
@@ -212,7 +233,10 @@ async function getDailyAttendanceView(date) {
         device_install_id,
         TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
         TO_CHAR(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
-        konum
+        konum,
+        is_in_school,
+        distance_meters,
+        flag_reason
       FROM attendance_records
       WHERE TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD') = $1
       ORDER BY attendance_records.created_at ASC, attendance_records.id ASC;
@@ -232,7 +256,10 @@ async function getMonthlyAttendanceView(month) {
         device_install_id,
         TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
         TO_CHAR(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
-        konum
+        konum,
+        is_in_school,
+        distance_meters,
+        flag_reason
       FROM attendance_records
       WHERE TO_CHAR(scan_time AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $1
       ORDER BY attendance_records.created_at ASC, attendance_records.id ASC;
@@ -280,7 +307,10 @@ async function getDailyAttendanceExportRows(date) {
         device_install_id,
         TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
         TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
-        konum
+        konum,
+        is_in_school,
+        distance_meters,
+        flag_reason
       FROM attendance_records
       WHERE TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD') = $1
       ORDER BY created_at ASC, id ASC;
@@ -300,7 +330,10 @@ async function getMonthlyAttendanceExportRows(month) {
         device_install_id,
         TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time,
         TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at,
-        konum
+        konum,
+        is_in_school,
+        distance_meters,
+        flag_reason
       FROM attendance_records
       WHERE TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $1
       ORDER BY created_at ASC, id ASC;
@@ -342,7 +375,10 @@ async function restoreSessionFromDatabase() {
         device_install_id,
         device_install_password,
         scan_time,
-        konum
+        konum,
+        is_in_school,
+        distance_meters,
+        flag_reason
       FROM attendance_records
       WHERE session_id = $1
       ORDER BY created_at ASC, id ASC;

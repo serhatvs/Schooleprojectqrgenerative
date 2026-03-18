@@ -26,6 +26,9 @@ const PORT = Number(process.env.PORT) || 3000;
 const SESSION_DURATION_MS = 10 * 60 * 1000;
 const DATE_QUERY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_QUERY_REGEX = /^\d{4}-\d{2}$/;
+const SCHOOL_LATITUDE = 38.73884317007882;
+const SCHOOL_LONGITUDE = 35.47434393140808;
+const SCHOOL_RADIUS_METERS = 600;
 
 function createActiveSessionError(session) {
   const error = new Error("An active session already exists.");
@@ -85,6 +88,9 @@ async function buildRestoredSession(restoredSession) {
       device_install_password: record.device_install_password,
       scan_time: toIsoString(record.scan_time),
       konum: record.konum,
+      is_in_school: record.is_in_school,
+      distance_meters: record.distance_meters,
+      flag_reason: record.flag_reason,
       session_id: record.session_id,
     };
   });
@@ -135,6 +141,71 @@ function isValidMonthQuery(value) {
   const month = Number(value.slice(5, 7));
 
   return month >= 1 && month <= 12;
+}
+
+function parseKonum(value) {
+  if (!isNonEmptyString(value)) {
+    return null;
+  }
+
+  const parts = value.split(",");
+
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  const latitude = Number(parts[0].trim());
+  const longitude = Number(parts[1].trim());
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return null;
+  }
+
+  return { latitude, longitude };
+}
+
+function toRadians(value) {
+  return (value * Math.PI) / 180;
+}
+
+function getDistanceMeters(from, to) {
+  const earthRadiusMeters = 6371000;
+  const deltaLatitude = toRadians(to.latitude - from.latitude);
+  const deltaLongitude = toRadians(to.longitude - from.longitude);
+  const fromLatitudeRadians = toRadians(from.latitude);
+  const toLatitudeRadians = toRadians(to.latitude);
+  const haversine =
+    Math.sin(deltaLatitude / 2) ** 2 +
+    Math.cos(fromLatitudeRadians) *
+      Math.cos(toLatitudeRadians) *
+      Math.sin(deltaLongitude / 2) ** 2;
+
+  return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function getLocationAudit(konum) {
+  const parsedKonum = parseKonum(konum);
+
+  if (!parsedKonum) {
+    return null;
+  }
+
+  const distanceMeters = getDistanceMeters(parsedKonum, {
+    latitude: SCHOOL_LATITUDE,
+    longitude: SCHOOL_LONGITUDE,
+  });
+
+  const isInSchool = distanceMeters <= SCHOOL_RADIUS_METERS;
+
+  return {
+    isInSchool,
+    distanceMeters,
+    flagReason: isInSchool ? null : "out_of_school",
+  };
 }
 
 function requireAdminSecret(req, res, next) {
@@ -422,12 +493,21 @@ function createSessionStore() {
         return { status: "duplicate_device" };
       }
 
+      const locationAudit = getLocationAudit(payload.konum);
+
+      if (locationAudit == null) {
+        return { status: "invalid_qr" };
+      }
+
       const scanRecord = {
         user_id: payload.user_id,
         device_install_id: payload.device_install_id,
         device_install_password: payload.device_install_password,
         scan_time: payload.scan_time,
         konum: payload.konum,
+        is_in_school: locationAudit.isInSchool,
+        distance_meters: locationAudit.distanceMeters,
+        flag_reason: locationAudit.flagReason,
         session_id: payload.session_id,
       };
 
@@ -493,6 +573,9 @@ function buildAttendanceCsv(rows) {
     "scan_time",
     "created_at",
     "konum",
+    "is_in_school",
+    "distance_meters",
+    "flag_reason",
   ].join(",");
   const lines = rows.map((row) =>
     [
@@ -502,6 +585,9 @@ function buildAttendanceCsv(rows) {
       row.scan_time,
       row.created_at,
       row.konum,
+      row.is_in_school,
+      row.distance_meters,
+      row.flag_reason,
     ]
       .map(escapeCsvValue)
       .join(",")
