@@ -220,6 +220,11 @@ async function restoreSessionFromDatabase() {
   }
 
   const session = sessionResult.rows[0];
+  // Keep raw timestamps for internal session restoration.
+  // If a future public/export/debug query exposes attendance_records rows,
+  // format timestamps as:
+  // TO_CHAR(scan_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS scan_time
+  // TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM-DD HH24:MI') AS created_at
   const attendanceResult = await query(
     `
       SELECT
