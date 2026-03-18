@@ -2,7 +2,10 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <title>Yoklama Gönder</title>
     <meta name="theme-color" content="#0f766e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -19,16 +22,43 @@
     <main class="page-shell">
       <section class="scanner-card">
         <p class="eyebrow">Yoklama</p>
-        <h1>Yoklama Gönder</h1>
+        <h1 id="page-title">Yoklama Gönder</h1>
         <p class="subtle-copy">
-          Öğrenci numaranızı girin ve yoklamayı doğrudan gönderin.
+          Bağlantı ile devam edin veya QR kodunu kamerayla okutun.
         </p>
 
         <p id="page-note" class="page-note">
           Bağlantı açıldıktan sonra konum izni vererek yoklamanızı gönderebilirsiniz.
         </p>
 
-        <form id="attendance-form" class="attendance-form">
+        <section id="scanner-section" class="scanner-section" hidden>
+          <button id="start-button" class="primary-button" type="button">
+            Tarayıcıyı Başlat
+          </button>
+
+          <section class="camera-panel" aria-labelledby="camera-title">
+            <div class="camera-panel-header">
+              <h2 id="camera-title">QR kodu okutunuz</h2>
+              <p>Kamera yalnızca başlat düğmesine bastığınızda açılır.</p>
+            </div>
+            <div id="scanner-shell" class="scanner-shell">
+              <div id="scanner-reader" class="scanner-reader" hidden></div>
+              <p id="scanner-placeholder" class="scanner-placeholder">
+                Tarayıcıyı başlattığınızda kamera görüntüsü burada açılır.
+              </p>
+            </div>
+          </section>
+
+          <p id="gallery-hint" class="helper-copy">
+            QR kodu ekran görüntüsü alıp galeriden seçebilirsiniz.
+          </p>
+
+          <button id="gallery-button" class="secondary-button" type="button">
+            Galeriden QR Seç
+          </button>
+        </section>
+
+        <form id="attendance-form" class="attendance-form" hidden>
           <label class="field" for="user-id-input">
             <span>Öğrenci No</span>
             <input
@@ -46,14 +76,6 @@
             Yoklamayı Gönder
           </button>
         </form>
-
-        <p id="gallery-hint" class="helper-copy" hidden>
-          QR kodu ekran görüntüsü alıp galeriden seçebilirsiniz.
-        </p>
-
-        <button id="gallery-button" class="secondary-button" type="button" hidden>
-          Galeriden QR Seç
-        </button>
 
         <input id="gallery-input" type="file" accept="image/*" hidden />
         <div id="gallery-decoder" class="gallery-decoder" aria-hidden="true"></div>

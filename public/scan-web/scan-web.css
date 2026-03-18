@@ -65,8 +65,11 @@ input {
 }
 
 h1,
+h2,
 .subtle-copy,
 .page-note,
+.camera-panel-header p,
+.scanner-placeholder,
 .field span,
 .result-banner {
   margin: 0;
@@ -78,17 +81,14 @@ h1 {
 }
 
 .subtle-copy,
-.page-note {
-  color: var(--muted);
-  line-height: 1.5;
-}
-
+.page-note,
+.camera-panel-header p,
 .helper-copy {
-  margin: -4px 0 0;
   color: var(--muted);
   line-height: 1.5;
 }
 
+.scanner-section,
 .attendance-form {
   display: grid;
   gap: 14px;
@@ -99,7 +99,8 @@ h1 {
   gap: 8px;
 }
 
-.field span {
+.field span,
+.camera-panel-header h2 {
   font-weight: 600;
 }
 
@@ -117,35 +118,77 @@ h1 {
   border-color: rgba(15, 118, 110, 0.42);
 }
 
-.primary-button {
-  min-height: 54px;
-  border: 0;
+.primary-button,
+.secondary-button {
+  min-height: 52px;
   border-radius: 16px;
-  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-strong) 100%);
-  color: #fff;
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
 }
 
-.primary-button:disabled {
-  opacity: 0.65;
-  cursor: default;
+.primary-button {
+  border: 0;
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-strong) 100%);
+  color: #fff;
 }
 
 .secondary-button {
-  min-height: 52px;
   border: 1px solid rgba(15, 118, 110, 0.2);
-  border-radius: 16px;
   background: rgba(15, 118, 110, 0.06);
   color: var(--primary-strong);
-  font-weight: 700;
-  cursor: pointer;
 }
 
+.primary-button:disabled,
 .secondary-button:disabled {
   opacity: 0.65;
   cursor: default;
+}
+
+.camera-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.camera-panel-header {
+  display: grid;
+  gap: 4px;
+}
+
+.scanner-shell {
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+  padding: 12px;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(15, 118, 110, 0.04) 0%, rgba(15, 118, 110, 0.08) 100%);
+  border: 1px solid rgba(15, 118, 110, 0.12);
+  overflow: hidden;
+}
+
+.scanner-reader {
+  width: 100%;
+}
+
+.scanner-reader video {
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 18px;
+}
+
+.scanner-reader > div {
+  border: 0 !important;
+}
+
+.scanner-reader img {
+  display: none !important;
+}
+
+.scanner-placeholder {
+  text-align: center;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .gallery-decoder {
@@ -192,5 +235,9 @@ h1 {
   .scanner-card {
     padding: 20px;
     border-radius: 20px;
+  }
+
+  .scanner-shell {
+    min-height: 280px;
   }
 }
