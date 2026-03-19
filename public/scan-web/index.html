@@ -31,7 +31,35 @@
           Bağlantı açıldıktan sonra konum izni vererek yoklamanızı gönderebilirsiniz.
         </p>
 
-        <section id="scanner-section" class="scanner-section" hidden>
+        <label class="field" for="user-id-input">
+          <span>Öğrenci Numarası</span>
+          <input
+            id="user-id-input"
+            form="attendance-form"
+            type="text"
+            inputmode="text"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="Öğrenci numarası"
+          />
+        </label>
+
+        <section
+          id="result-banner"
+          class="result-banner result-idle"
+          aria-live="polite"
+        >
+          Yoklama bağlantısı hazırlanıyor.
+        </section>
+
+        <form id="attendance-form" class="attendance-form">
+          <button id="submit-button" class="primary-button" type="submit">
+            Yoklamayı Gönder
+          </button>
+        </form>
+
+        <section id="scanner-section" class="scanner-section">
           <button id="start-button" class="primary-button" type="button">
             Tarayıcıyı Başlat
           </button>
@@ -58,35 +86,22 @@
           </button>
         </section>
 
-        <form id="attendance-form" class="attendance-form" hidden>
-          <label class="field" for="user-id-input">
-            <span>Öğrenci No</span>
-            <input
-              id="user-id-input"
-              type="text"
-              inputmode="text"
-              autocomplete="off"
-              autocapitalize="off"
-              spellcheck="false"
-              placeholder="Öğrenci numarası"
-            />
-          </label>
-
-          <button id="submit-button" class="primary-button" type="submit">
-            Yoklamayı Gönder
-          </button>
-        </form>
+        <label class="field" for="session-id-input">
+          <span>Session ID (manuel)</span>
+          <input
+            id="session-id-input"
+            form="attendance-form"
+            type="text"
+            inputmode="text"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="Session ID"
+          />
+        </label>
 
         <input id="gallery-input" type="file" accept="image/*" hidden />
         <div id="gallery-decoder" class="gallery-decoder" aria-hidden="true"></div>
-
-        <section
-          id="result-banner"
-          class="result-banner result-idle"
-          aria-live="polite"
-        >
-          Yoklama bağlantısı hazırlanıyor.
-        </section>
       </section>
     </main>
   </body>

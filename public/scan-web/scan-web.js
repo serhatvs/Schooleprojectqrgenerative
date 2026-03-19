@@ -12,7 +12,8 @@ const RESULT_MESSAGES = {
   invalid_qr: { text: "Geçersiz bağlantı", tone: "danger" },
   invalid_scanned_qr: { text: "Geçersiz QR", tone: "danger" },
   unreadable_qr: { text: "QR okunamadı", tone: "danger" },
-  missing_user_id: { text: "Öğrenci numarası giriniz", tone: "warning" },
+  missing_user_id: { text: "Öğrenci numarası gerekli", tone: "warning" },
+  missing_session_id: { text: "Session ID gerekli", tone: "warning" },
   location_required: { text: "Konum izni gerekli", tone: "warning" },
   scanner_prompt: { text: "QR kodu okutunuz", tone: "idle" },
   ready: { text: "Yoklamayı gönderebilirsiniz", tone: "idle" },
@@ -35,6 +36,7 @@ const scannerReader = document.getElementById("scanner-reader");
 const scannerPlaceholder = document.getElementById("scanner-placeholder");
 const attendanceForm = document.getElementById("attendance-form");
 const userIdInput = document.getElementById("user-id-input");
+const sessionIdInput = document.getElementById("session-id-input");
 const submitButton = document.getElementById("submit-button");
 const galleryButton = document.getElementById("gallery-button");
 const galleryInput = document.getElementById("gallery-input");
@@ -156,25 +158,28 @@ function clearResumeTimer() {
 }
 
 function syncUi() {
-  const isScannerMode = viewMode === "scanner";
   const isBusy = isStartingScanner || isSubmitting || isDecoding;
 
-  scannerSection.hidden = !isScannerMode;
-  attendanceForm.hidden = isScannerMode;
+  scannerSection.hidden = false;
+  attendanceForm.hidden = false;
 
-  startButton.disabled = !isScannerMode || isBusy || isScannerRunning;
-  galleryButton.disabled = !isScannerMode || isBusy;
+  startButton.disabled = isBusy || isScannerRunning;
+  galleryButton.disabled = isBusy;
   userIdInput.disabled = isSubmitting;
-  submitButton.disabled =
-    viewMode !== "form" || isSubmitting || !sessionId || !getCurrentUserId();
+  sessionIdInput.disabled = isSubmitting;
+  submitButton.disabled = isSubmitting;
 
-  if (!isScannerMode) {
+  if (!isScannerRunning && !isStartingScanner) {
     setScannerVisible(false);
   }
 }
 
 function getCurrentUserId() {
   return userIdInput.value.trim();
+}
+
+function getCurrentSessionId() {
+  return sessionIdInput.value.trim();
 }
 
 function getStatusMessage(status) {
@@ -212,18 +217,32 @@ function enterFormMode() {
 function applySessionId(nextSessionId) {
   const normalizedSessionId =
     typeof nextSessionId === "string" ? nextSessionId.trim() : "";
+  const hadSessionId = Boolean(sessionId);
 
-  if (!normalizedSessionId) {
+  sessionId = normalizedSessionId;
+  sessionIdInput.value = normalizedSessionId;
+
+  const nextUrl = new URL(window.location.href);
+
+  if (normalizedSessionId) {
+    nextUrl.searchParams.set("session_id", normalizedSessionId);
+  } else {
+    nextUrl.searchParams.delete("session_id");
+  }
+
+  window.history.replaceState({}, "", nextUrl);
+
+  if (Boolean(normalizedSessionId) !== hadSessionId) {
+    if (normalizedSessionId) {
+      enterFormMode();
+      return;
+    }
+
+    enterScannerMode();
     return;
   }
 
-  sessionId = normalizedSessionId;
-
-  const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.set("session_id", normalizedSessionId);
-  window.history.replaceState({}, "", nextUrl);
-
-  enterFormMode();
+  syncUi();
 }
 
 function extractSessionIdFromUrl(decodedText) {
@@ -353,13 +372,7 @@ function chooseCamera(cameras) {
 }
 
 async function startScanner() {
-  if (
-    viewMode !== "scanner" ||
-    isScannerRunning ||
-    isStartingScanner ||
-    isSubmitting ||
-    isDecoding
-  ) {
+  if (isScannerRunning || isStartingScanner || isSubmitting || isDecoding) {
     return;
   }
 
@@ -422,7 +435,7 @@ async function startScanner() {
 }
 
 async function handleScanSuccess(decodedText) {
-  if (viewMode !== "scanner" || isHandlingScan || isDecoding || isSubmitting) {
+  if (isHandlingScan || isDecoding || isSubmitting) {
     return;
   }
 
@@ -435,7 +448,7 @@ async function handleScanSuccess(decodedText) {
     setResult(qrResult.error.text, qrResult.error.tone);
     resumeTimer = window.setTimeout(() => {
       isHandlingScan = false;
-      if (viewMode === "scanner" && isScannerRunning) {
+      if (isScannerRunning) {
         setResult(RESULT_MESSAGES.scanner_prompt.text, RESULT_MESSAGES.scanner_prompt.tone);
       }
     }, SCAN_COOLDOWN_MS);
@@ -450,7 +463,7 @@ async function handleScanSuccess(decodedText) {
 async function handleGalleryInputChange() {
   const file = galleryInput.files?.[0];
 
-  if (!file || viewMode !== "scanner" || isDecoding || isSubmitting) {
+  if (!file || isDecoding || isSubmitting) {
     return;
   }
 
@@ -510,9 +523,23 @@ async function submitAttendanceWithKonum(konum) {
 async function handleSubmit(event) {
   event.preventDefault();
 
-  if (viewMode !== "form" || isSubmitting || !sessionId) {
+  if (isSubmitting) {
     return;
   }
+
+  const currentSessionId = getCurrentSessionId();
+
+  if (!currentSessionId) {
+    setResult(
+      RESULT_MESSAGES.missing_session_id.text,
+      RESULT_MESSAGES.missing_session_id.tone
+    );
+    sessionIdInput.focus();
+    syncUi();
+    return;
+  }
+
+  applySessionId(currentSessionId);
 
   const userId = getCurrentUserId();
 
@@ -571,12 +598,11 @@ function handlePageHide() {
 }
 
 function initPage() {
-  sessionId = getSessionIdFromQuery();
   loadStoredUserId();
   ensureDeviceCredentials();
+  applySessionId(getSessionIdFromQuery());
 
   if (sessionId) {
-    applySessionId(sessionId);
     return;
   }
 
@@ -587,6 +613,9 @@ function init() {
   userIdInput.addEventListener("input", () => {
     persistUserId();
     syncUi();
+  });
+  sessionIdInput.addEventListener("input", () => {
+    applySessionId(sessionIdInput.value);
   });
   attendanceForm.addEventListener("submit", (event) => {
     void handleSubmit(event);
