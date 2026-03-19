@@ -3,249 +3,134 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Yoklama Ekranı</title>
+    <title>Yoklama Girişi</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(23, 103, 255, 0.08), transparent 28%),
+          linear-gradient(180deg, #f7f9fb 0%, #f4f6f8 100%);
+        color: #162033;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+
+      .landing-shell {
+        width: min(100%, 720px);
+        padding: 28px;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #1767ff;
+      }
+
+      h1,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(1.9rem, 4vw, 2.6rem);
+        line-height: 1.1;
+      }
+
+      .subtle-copy {
+        margin-top: 12px;
+        color: #667085;
+        line-height: 1.6;
+      }
+
+      .link-grid {
+        display: grid;
+        gap: 14px;
+        margin-top: 24px;
+      }
+
+      .nav-card {
+        display: block;
+        padding: 18px 20px;
+        border-radius: 18px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        color: #162033;
+        text-decoration: none;
+        transition:
+          transform 0.15s ease,
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      .nav-card:hover,
+      .nav-card:focus-visible {
+        transform: translateY(-1px);
+        border-color: rgba(23, 103, 255, 0.22);
+        box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
+      }
+
+      .nav-card-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+      }
+
+      .nav-card-copy {
+        margin-top: 6px;
+        color: #667085;
+        line-height: 1.5;
+      }
+
+      @media (min-width: 640px) {
+        .link-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+    </style>
   </head>
   <body>
-    <main class="page-shell">
-      <section class="panel" aria-labelledby="panel-title">
-        <div class="panel-header">
-          <p class="eyebrow">Yoklama</p>
-          <h1 id="panel-title">Yoklama Ekranı</h1>
-          <p class="subtle-copy">
-            Yeni yoklama başlatın ve QR kodu öğrencilerin göreceği şekilde ekranda tutun.
-          </p>
-        </div>
+    <main class="landing-shell">
+      <p class="eyebrow">Yoklama</p>
+      <h1>Yoklama uygulaması girişleri</h1>
+      <p class="subtle-copy">
+        İlgili ekrana geçmek için aşağıdaki bağlantılardan birini seçin.
+      </p>
 
-        <div class="panel-layout">
-          <section class="session-section" aria-labelledby="session-title">
-            <div class="section-header">
-              <h2 id="session-title" class="section-title">Yoklama Kontrolü</h2>
-              <p class="section-copy">
-                Aktif QR kodu oluşturun ve öğrenciler için ekranda görünür tutun.
-              </p>
-            </div>
+      <section class="link-grid" aria-label="Ana gezinme">
+        <a class="nav-card" href="/admin">
+          <div class="nav-card-title">Yönetici Paneli</div>
+          <div class="nav-card-copy">QR oluşturma ve kayıt ekranını açın.</div>
+        </a>
 
-            <div class="qr-card" aria-live="polite">
-              <img
-                id="qr-image"
-                class="qr-image"
-                alt="Yoklama QR kodu"
-                hidden
-              />
-              <div id="qr-placeholder" class="qr-placeholder">
-                <p id="placeholder-title" class="placeholder-title">
-                  Henüz aktif yoklama yok
-                </p>
-                <p id="placeholder-copy" class="placeholder-copy">
-                  QR kod oluşturmak için yoklama başlatın.
-                </p>
-              </div>
-            </div>
+        <a class="nav-card" href="/scan-web">
+          <div class="nav-card-title">Yoklama Girişi</div>
+          <div class="nav-card-copy">Öğrenci yoklama gönderim ekranına gidin.</div>
+        </a>
 
-            <div class="actions">
-              <button id="start-button" class="button button-primary" type="button">
-                Yoklama Başlat
-              </button>
-              <button id="end-button" class="button button-secondary" type="button">
-                Yoklamayı Bitir
-              </button>
-            </div>
-
-            <dl class="session-details">
-              <div class="detail-row">
-                <dt>Yoklama Kodu</dt>
-                <dd id="session-id">-</dd>
-              </div>
-              <div class="detail-row">
-                <dt>Başlangıç Saati</dt>
-                <dd id="start-time">-</dd>
-              </div>
-              <div class="detail-row">
-                <dt>Bitiş Saati</dt>
-                <dd id="expiration-time">-</dd>
-              </div>
-              <div class="detail-row">
-                <dt>Durum</dt>
-                <dd>
-                  <span id="status-badge" class="status-badge status-idle">
-                    Henüz Başlatılmadı
-                  </span>
-                </dd>
-              </div>
-            </dl>
-          </section>
-
-          <section class="dashboard-section" aria-labelledby="dashboard-title">
-            <div class="dashboard-header">
-              <div>
-                <p class="eyebrow dashboard-eyebrow">Kayıtlar</p>
-                <h2 id="dashboard-title" class="section-title">
-                  Yoklama Kayıtları
-                </h2>
-                <p class="section-copy">
-                  Günlük ve aylık yoklama kayıtlarını inceleyin, şüpheli kayıtları görün ve Excel'e aktarın.
-                </p>
-              </div>
-              <p id="dashboard-status" class="dashboard-status" aria-live="polite">
-                Yükleniyor...
-              </p>
-            </div>
-
-            <section class="overview-grid" aria-label="Özet">
-              <article class="overview-card">
-                <p class="overview-label">Bugünkü Katılım</p>
-                <p id="today-attendance-value" class="overview-value">0</p>
-              </article>
-              <article class="overview-card">
-                <p class="overview-label">Bugünkü Yoklama</p>
-                <p id="today-session-value" class="overview-value">0</p>
-              </article>
-              <article class="overview-card">
-                <p class="overview-label">Toplam Katılım</p>
-                <p id="total-attendance-value" class="overview-value">0</p>
-              </article>
-              <article class="overview-card overview-card-warning">
-                <p class="overview-label">Şüpheli Kayıt</p>
-                <p id="flagged-attendance-value" class="overview-value">0</p>
-              </article>
-            </section>
-
-            <section class="controls-grid" aria-label="Seçim ve dışa aktarım">
-              <article class="control-card">
-                <h3 class="control-title">Günlük Kayıtlar</h3>
-                <label class="field-label" for="daily-date-input">Tarih</label>
-                <input id="daily-date-input" class="input-field" type="date" />
-                <div class="button-row">
-                  <button id="daily-view-button" class="button button-secondary" type="button">
-                    Görüntüle
-                  </button>
-                  <button id="daily-export-button" class="button button-secondary" type="button">
-                    Günlük Dışa Aktarım (Excel)
-                  </button>
-                </div>
-              </article>
-
-              <article class="control-card">
-                <h3 class="control-title">Aylık Kayıtlar</h3>
-                <label class="field-label" for="monthly-month-input">Ay</label>
-                <input id="monthly-month-input" class="input-field" type="month" />
-                <div class="button-row">
-                  <button id="monthly-view-button" class="button button-secondary" type="button">
-                    Görüntüle
-                  </button>
-                  <button id="monthly-export-button" class="button button-secondary" type="button">
-                    Aylık Dışa Aktarım (Excel)
-                  </button>
-                </div>
-              </article>
-
-              <article class="control-card">
-                <h3 class="control-title">Tüm Kayıtlar</h3>
-                <p class="control-copy">
-                  Tüm yoklama kayıtlarını Excel dosyası olarak alabilirsiniz.
-                </p>
-                <button id="total-export-button" class="button button-primary" type="button">
-                  Tüm Kayıtları Dışa Aktar (Excel)
-                </button>
-              </article>
-            </section>
-
-            <section class="table-card" aria-labelledby="daily-summary-title">
-              <div class="table-card-header">
-                <h3 id="daily-summary-title">Günlük Özet</h3>
-                <p>Seçilen gün veya ay için yoklama kayıtlarını Excel dosyası olarak indirebilirsiniz.</p>
-              </div>
-              <div class="table-wrap">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Tarih</th>
-                      <th>Yoklama Sayısı</th>
-                      <th>Katılım Sayısı</th>
-                      <th>Şüpheli Sayısı</th>
-                      <th>İşlem</th>
-                    </tr>
-                  </thead>
-                  <tbody id="daily-summary-body"></tbody>
-                </table>
-              </div>
-            </section>
-
-            <section class="table-card" aria-labelledby="daily-detail-title">
-              <div class="table-card-header">
-                <h3 id="daily-detail-title">Günlük Kayıtlar</h3>
-                <p id="daily-detail-copy">Seçilen günün yoklama kayıtları burada görünür.</p>
-              </div>
-              <div class="table-wrap">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Öğrenci Numarası</th>
-                      <th>Yoklama Kodu</th>
-                      <th>Okutma Saati</th>
-                      <th>Kayıt Saati</th>
-                      <th>Konum</th>
-                      <th>Kampüs İçinde</th>
-                      <th>Uzaklık</th>
-                      <th>Uyarı Nedeni</th>
-                    </tr>
-                  </thead>
-                  <tbody id="daily-detail-body"></tbody>
-                </table>
-              </div>
-            </section>
-
-            <section class="table-card" aria-labelledby="monthly-summary-title">
-              <div class="table-card-header">
-                <h3 id="monthly-summary-title">Aylık Özet</h3>
-                <p>Aylara göre yoklama toplamlarını görebilirsiniz.</p>
-              </div>
-              <div class="table-wrap">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Ay</th>
-                      <th>Yoklama Sayısı</th>
-                      <th>Katılım Sayısı</th>
-                      <th>Şüpheli Sayısı</th>
-                      <th>İşlem</th>
-                    </tr>
-                  </thead>
-                  <tbody id="monthly-summary-body"></tbody>
-                </table>
-              </div>
-            </section>
-
-            <section class="table-card" aria-labelledby="monthly-detail-title">
-              <div class="table-card-header">
-                <h3 id="monthly-detail-title">Aylık Kayıtlar</h3>
-                <p id="monthly-detail-copy">Seçilen aya ait yoklama kayıtları burada görünür.</p>
-              </div>
-              <div class="table-wrap">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Öğrenci Numarası</th>
-                      <th>Yoklama Kodu</th>
-                      <th>Okutma Saati</th>
-                      <th>Kayıt Saati</th>
-                      <th>Konum</th>
-                      <th>Kampüs İçinde</th>
-                      <th>Uzaklık</th>
-                      <th>Uyarı Nedeni</th>
-                    </tr>
-                  </thead>
-                  <tbody id="monthly-detail-body"></tbody>
-                </table>
-              </div>
-            </section>
-          </section>
-        </div>
+        <a class="nav-card" href="/public-qr">
+          <div class="nav-card-title">QR Görüntüleme</div>
+          <div class="nav-card-copy">Aktif QR kodunu görüntüleme ekranını açın.</div>
+        </a>
       </section>
     </main>
-
-    <script src="/app.js" defer></script>
   </body>
 </html>

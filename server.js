@@ -410,7 +410,7 @@ function renderAdminBootstrapPage() {
         const trimmedSecret = secret.trim();
 
         try {
-          const pageResult = await fetchProtectedText("/", trimmedSecret);
+          const pageResult = await fetchProtectedText("/__admin/panel", trimmedSecret);
 
           if (pageResult.response.status === 403) {
             showMessage("Yönetici şifresi eksik veya hatalı.");
@@ -891,8 +891,12 @@ function createApp() {
   app.use("/scan-web", express.static(scanWebDir, { index: false }));
   app.use("/public-qr", express.static(publicQrDir, { index: false }));
 
-  app.get("/", requireAdminSecret, (req, res) => {
+  app.get("/", (req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
+  });
+
+  app.get("/__admin/panel", requireAdminSecret, (req, res) => {
+    res.sendFile(path.join(publicDir, "admin-panel.html"));
   });
 
   app.get("/api/session/current-qr", async (req, res) => {

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yoklama Ekranı</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="panel" aria-labelledby="panel-title">
+        <div class="panel-header">
+          <p class="eyebrow">Yoklama</p>
+          <h1 id="panel-title">Yoklama Ekranı</h1>
+          <p class="subtle-copy">
+            Yeni yoklama başlatın ve QR kodu öğrencilerin göreceği şekilde ekranda tutun.
+          </p>
+        </div>
+
+        <div class="panel-layout">
+          <section class="session-section" aria-labelledby="session-title">
+            <div class="section-header">
+              <h2 id="session-title" class="section-title">Yoklama Kontrolü</h2>
+              <p class="section-copy">
+                Aktif QR kodu oluşturun ve öğrenciler için ekranda görünür tutun.
+              </p>
+            </div>
+
+            <div class="qr-card" aria-live="polite">
+              <img
+                id="qr-image"
+                class="qr-image"
+                alt="Yoklama QR kodu"
+                hidden
+              />
+              <div id="qr-placeholder" class="qr-placeholder">
+                <p id="placeholder-title" class="placeholder-title">
+                  Henüz aktif yoklama yok
+                </p>
+                <p id="placeholder-copy" class="placeholder-copy">
+                  QR kod oluşturmak için yoklama başlatın.
+                </p>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="start-button" class="button button-primary" type="button">
+                Yoklama Başlat
+              </button>
+              <button id="end-button" class="button button-secondary" type="button">
+                Yoklamayı Bitir
+              </button>
+            </div>
+
+            <dl class="session-details">
+              <div class="detail-row">
+                <dt>Yoklama Kodu</dt>
+                <dd id="session-id">-</dd>
+              </div>
+              <div class="detail-row">
+                <dt>Başlangıç Saati</dt>
+                <dd id="start-time">-</dd>
+              </div>
+              <div class="detail-row">
+                <dt>Bitiş Saati</dt>
+                <dd id="expiration-time">-</dd>
+              </div>
+              <div class="detail-row">
+                <dt>Durum</dt>
+                <dd>
+                  <span id="status-badge" class="status-badge status-idle">
+                    Henüz Başlatılmadı
+                  </span>
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="dashboard-section" aria-labelledby="dashboard-title">
+            <div class="dashboard-header">
+              <div>
+                <p class="eyebrow dashboard-eyebrow">Kayıtlar</p>
+                <h2 id="dashboard-title" class="section-title">
+                  Yoklama Kayıtları
+                </h2>
+                <p class="section-copy">
+                  Günlük ve aylık yoklama kayıtlarını inceleyin, şüpheli kayıtları görün ve Excel'e aktarın.
+                </p>
+              </div>
+              <p id="dashboard-status" class="dashboard-status" aria-live="polite">
+                Yükleniyor...
+              </p>
+            </div>
+
+            <section class="overview-grid" aria-label="Özet">
+              <article class="overview-card">
+                <p class="overview-label">Bugünkü Katılım</p>
+                <p id="today-attendance-value" class="overview-value">0</p>
+              </article>
+              <article class="overview-card">
+                <p class="overview-label">Bugünkü Yoklama</p>
+                <p id="today-session-value" class="overview-value">0</p>
+              </article>
+              <article class="overview-card">
+                <p class="overview-label">Toplam Katılım</p>
+                <p id="total-attendance-value" class="overview-value">0</p>
+              </article>
+              <article class="overview-card overview-card-warning">
+                <p class="overview-label">Şüpheli Kayıt</p>
+                <p id="flagged-attendance-value" class="overview-value">0</p>
+              </article>
+            </section>
+
+            <section class="controls-grid" aria-label="Seçim ve dışa aktarım">
+              <article class="control-card">
+                <h3 class="control-title">Günlük Kayıtlar</h3>
+                <label class="field-label" for="daily-date-input">Tarih</label>
+                <input id="daily-date-input" class="input-field" type="date" />
+                <div class="button-row">
+                  <button id="daily-view-button" class="button button-secondary" type="button">
+                    Görüntüle
+                  </button>
+                  <button id="daily-export-button" class="button button-secondary" type="button">
+                    Günlük Dışa Aktarım (Excel)
+                  </button>
+                </div>
+              </article>
+
+              <article class="control-card">
+                <h3 class="control-title">Aylık Kayıtlar</h3>
+                <label class="field-label" for="monthly-month-input">Ay</label>
+                <input id="monthly-month-input" class="input-field" type="month" />
+                <div class="button-row">
+                  <button id="monthly-view-button" class="button button-secondary" type="button">
+                    Görüntüle
+                  </button>
+                  <button id="monthly-export-button" class="button button-secondary" type="button">
+                    Aylık Dışa Aktarım (Excel)
+                  </button>
+                </div>
+              </article>
+
+              <article class="control-card">
+                <h3 class="control-title">Tüm Kayıtlar</h3>
+                <p class="control-copy">
+                  Tüm yoklama kayıtlarını Excel dosyası olarak alabilirsiniz.
+                </p>
+                <button id="total-export-button" class="button button-primary" type="button">
+                  Tüm Kayıtları Dışa Aktar (Excel)
+                </button>
+              </article>
+            </section>
+
+            <section class="table-card" aria-labelledby="daily-summary-title">
+              <div class="table-card-header">
+                <h3 id="daily-summary-title">Günlük Özet</h3>
+                <p>Seçilen gün veya ay için yoklama kayıtlarını Excel dosyası olarak indirebilirsiniz.</p>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Tarih</th>
+                      <th>Yoklama Sayısı</th>
+                      <th>Katılım Sayısı</th>
+                      <th>Şüpheli Sayısı</th>
+                      <th>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody id="daily-summary-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="table-card" aria-labelledby="daily-detail-title">
+              <div class="table-card-header">
+                <h3 id="daily-detail-title">Günlük Kayıtlar</h3>
+                <p id="daily-detail-copy">Seçilen günün yoklama kayıtları burada görünür.</p>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Öğrenci Numarası</th>
+                      <th>Yoklama Kodu</th>
+                      <th>Okutma Saati</th>
+                      <th>Kayıt Saati</th>
+                      <th>Konum</th>
+                      <th>Kampüs İçinde</th>
+                      <th>Uzaklık</th>
+                      <th>Uyarı Nedeni</th>
+                    </tr>
+                  </thead>
+                  <tbody id="daily-detail-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="table-card" aria-labelledby="monthly-summary-title">
+              <div class="table-card-header">
+                <h3 id="monthly-summary-title">Aylık Özet</h3>
+                <p>Aylara göre yoklama toplamlarını görebilirsiniz.</p>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Ay</th>
+                      <th>Yoklama Sayısı</th>
+                      <th>Katılım Sayısı</th>
+                      <th>Şüpheli Sayısı</th>
+                      <th>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody id="monthly-summary-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="table-card" aria-labelledby="monthly-detail-title">
+              <div class="table-card-header">
+                <h3 id="monthly-detail-title">Aylık Kayıtlar</h3>
+                <p id="monthly-detail-copy">Seçilen aya ait yoklama kayıtları burada görünür.</p>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Öğrenci Numarası</th>
+                      <th>Yoklama Kodu</th>
+                      <th>Okutma Saati</th>
+                      <th>Kayıt Saati</th>
+                      <th>Konum</th>
+                      <th>Kampüs İçinde</th>
+                      <th>Uzaklık</th>
+                      <th>Uyarı Nedeni</th>
+                    </tr>
+                  </thead>
+                  <tbody id="monthly-detail-body"></tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
